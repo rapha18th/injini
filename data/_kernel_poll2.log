@@ -1,0 +1,3 @@
+13:31:13 thetraveller/injini-train has status "KernelWorkerStatus.RUNNING"
+13:32:45 thetraveller/injini-train has status "KernelWorkerStatus.ERROR"
+DONE: thetraveller/injini-train has status "KernelWorkerStatus.ERROR"
