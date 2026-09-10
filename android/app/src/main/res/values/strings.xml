@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Injini</string>
+    <string name="tagline">Hear a failing engine</string>
+    <string name="check">Check</string>
+    <string name="enrol">Enrol machine</string>
+    <string name="full_results">Full model results</string>
+</resources>

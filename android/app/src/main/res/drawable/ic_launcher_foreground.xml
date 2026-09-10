@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Placeholder mark: a simple sound-wave-ish glyph. Swap via Android
+     Studio's Image Asset wizard (right-click res/ -> New -> Image Asset)
+     whenever there's time for real branding — not a priority for a demo. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#EEF4EE"
+        android:pathData="M34,44 L34,64 M44,34 L44,74 M54,24 L54,84 M64,34 L64,74 M74,44 L74,64"
+        android:strokeColor="#EEF4EE"
+        android:strokeWidth="8"
+        android:strokeLineCap="round" />
+</vector>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Injini" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/injini_amber</item>
+        <item name="colorSecondary">@color/injini_green</item>
+        <item name="android:windowBackground">@color/injini_bg</item>
+        <item name="android:statusBarColor">@color/injini_bg</item>
+        <item name="android:navigationBarColor">@color/injini_bg</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

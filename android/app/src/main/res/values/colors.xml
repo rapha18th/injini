@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Instrument-panel palette: near-black ground, warm amber for the reading,
+         cool grey for chrome. Deliberately spare. -->
+    <color name="injini_bg">#0B0E11</color>
+    <color name="injini_surface">#14181D</color>
+    <color name="injini_line">#232A31</color>
+    <color name="injini_text">#E7ECEF</color>
+    <color name="injini_dim">#8A97A0</color>
+    <color name="injini_amber">#E0A64B</color>
+    <color name="injini_green">#5BB98C</color>
+    <color name="injini_red">#D4694E</color>
+</resources>
