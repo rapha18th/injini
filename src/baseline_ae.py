@@ -96,7 +96,11 @@ def clip_score(net, c, device):
 
 
 def evaluate(source, root, epochs=100, machines=None, limit=None):
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    # Kaggle's current torch build dropped sm_60 (P100), so default to CPU;
+    # this net is tiny. Override with INJINI_DEVICE=cuda where the GPU works.
+    device = os.environ.get("INJINI_DEVICE", "cpu")
+    if device == "cuda" and not torch.cuda.is_available():
+        device = "cpu"
     if source == "hf":
         import dcase_hf as H
         clips, by_machine = H.load(machines=machines, limit=limit), None

@@ -63,13 +63,17 @@ class OnnxBackend:
 
 class PasstBackend:
     def __init__(self):
+        import torch
         from hear21passt.base import load_model, get_scene_embeddings
 
-        self.model = load_model(mode="embed_only").eval()
-        self._embed = get_scene_embeddings
-        import torch
-
         self.torch = torch
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        try:
+            _ = torch.zeros(1, device=self.device)  # trip sm_60 mismatch early
+        except Exception:
+            self.device = "cpu"
+        self.model = load_model(mode="embed_only").eval().to(self.device)
+        self._embed = get_scene_embeddings
 
     def embed(self, waves: list[np.ndarray], batch: int = 8) -> np.ndarray:
         out = []
@@ -79,7 +83,7 @@ class PasstBackend:
             arr = np.zeros((len(chunk), n), dtype=np.float32)
             for j, w in enumerate(chunk):
                 arr[j, : len(w)] = w
-            t = self.torch.from_numpy(arr)
+            t = self.torch.from_numpy(arr).to(self.device)
             with self.torch.no_grad():
                 out.append(self._embed(t, self.model).cpu().numpy())
         e = np.concatenate(out, axis=0).astype(np.float32)

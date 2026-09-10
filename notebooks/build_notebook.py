@@ -131,13 +131,12 @@ md("## 4. Reproduce the DCASE autoencoder baseline")
 code("!python src/baseline_ae.py --epochs 100")
 
 md("""
-## 5. Reference ceiling — PaSST transformer embedding
-The published state of the art in one reproducible form: a frozen transformer
-embedding with whitening plus a kNN distance.
-""")
-code("""
-!python src/eval_dcase.py --backend passt --scorer knn --whiten 128 \
-    --out models/eval_passt_knn_w128.json || echo "passt backend failed, continuing"
+## 5. Reference anchors
+Kaggle's current torch build dropped P100 support, so the PaSST transformer
+reference is deferred to a targeted CPU run. The anchors for this table are the
+reproduced DCASE autoencoder baseline above and the published DCASE 2025
+Task 2 results: baseline source AUC roughly 62-78 %, target AUC high-30s to
+low-50s, pAUC 48-62 %; only 20 of 35 teams beat both baselines.
 """)
 
 md("""
@@ -147,10 +146,9 @@ Mahalanobis variant and a no-whitening variant for the ablation.
 """)
 code("""
 !python src/embedder.py --name mn10_as --out models/injini_mn10_as_fp32.onnx
-FP=onnx:models/injini_mn10_as_fp32.onnx
-!python src/eval_dcase.py --backend $FP --scorer knn  --whiten 128 --out models/eval_mn10_fp32_knn_w128.json
-!python src/eval_dcase.py --backend $FP --scorer maha --whiten 128 --out models/eval_mn10_fp32_maha_w128.json
-!python src/eval_dcase.py --backend $FP --scorer knn  --whiten 0   --out models/eval_mn10_fp32_knn_w0.json
+!python src/eval_dcase.py --backend onnx:models/injini_mn10_as_fp32.onnx --scorer knn  --whiten 128 --out models/eval_mn10_fp32_knn_w128.json
+!python src/eval_dcase.py --backend onnx:models/injini_mn10_as_fp32.onnx --scorer maha --whiten 128 --out models/eval_mn10_fp32_maha_w128.json
+!python src/eval_dcase.py --backend onnx:models/injini_mn10_as_fp32.onnx --scorer knn  --whiten 0   --out models/eval_mn10_fp32_knn_w0.json
 !python export/quantize.py --fp32 models/injini_mn10_as_fp32.onnx --calib-dir data/calib --n-calib 256
 !python src/eval_dcase.py --backend onnx:models/injini_mn10_as_int8.onnx --scorer knn --whiten 128 --out models/eval_mn10_int8_knn_w128.json
 """)
