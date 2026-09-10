@@ -62,13 +62,14 @@ Then Run All.
 md("## 1. Workspace and pipeline files")
 code("""
 import os, sys, shutil, json, glob, time, subprocess
-WORK = "/kaggle/working/injini"
-os.makedirs(WORK + "/src", exist_ok=True)
-os.makedirs(WORK + "/export", exist_ok=True)
-os.makedirs(WORK + "/models", exist_ok=True)
-os.makedirs(WORK + "/data", exist_ok=True)
+# workspace OUTSIDE /kaggle/working so the 2 GB DCASE download is not saved as
+# kernel output; only the small artefacts are copied there at the end.
+WORK = "/tmp/injini"
+OUTDIR = "/kaggle/working"
+for d in ("src", "export", "models", "data"):
+    os.makedirs(os.path.join(WORK, d), exist_ok=True)
 os.chdir(WORK)
-sys.path.insert(0, WORK + "/src")
+sys.path.insert(0, os.path.join(WORK, "src"))
 print("workspace", WORK)
 """)
 
@@ -118,38 +119,36 @@ md("## 4. Reproduce the DCASE autoencoder baseline")
 code("!python src/baseline_ae.py --root data/dcase2025_dev --epochs 100")
 
 md("""
-## 5. Reference ceiling — PaSST transformer embedding + Mahalanobis
-The published state of the art in one reproducible form.
+## 5. Reference ceiling — PaSST transformer embedding
+The published state of the art in one reproducible form: a frozen transformer
+embedding with whitening plus a kNN distance.
 """)
 code("""
-!python src/eval_dcase.py --root data/dcase2025_dev --backend passt --scorer maha \
-    --out models/eval_passt_maha.json || echo "passt backend failed, continuing"
+!python src/eval_dcase.py --root data/dcase2025_dev --backend passt --scorer knn --whiten 128 \
+    --out models/eval_passt_knn_w128.json || echo "passt backend failed, continuing"
 """)
 
-md("## 6. Frozen EfficientAT mn10_as — FP32, then static INT8")
+md("""
+## 6. Frozen EfficientAT mn10_as — the shipped pipeline
+Whitening + kNN + per-machine score normalisation, FP32 then static INT8. A
+Mahalanobis variant and a no-whitening variant for the ablation.
+""")
 code("""
 !python src/embedder.py --name mn10_as --out models/injini_mn10_as_fp32.onnx
-!python src/eval_dcase.py --root data/dcase2025_dev \
-    --backend onnx:models/injini_mn10_as_fp32.onnx --scorer maha --out models/eval_mn10_fp32_maha.json
+FP=onnx:models/injini_mn10_as_fp32.onnx
+!python src/eval_dcase.py --root data/dcase2025_dev --backend $FP --scorer knn  --whiten 128 --out models/eval_mn10_fp32_knn_w128.json
+!python src/eval_dcase.py --root data/dcase2025_dev --backend $FP --scorer maha --whiten 128 --out models/eval_mn10_fp32_maha_w128.json
+!python src/eval_dcase.py --root data/dcase2025_dev --backend $FP --scorer knn  --whiten 0   --out models/eval_mn10_fp32_knn_w0.json
 !python export/quantize.py --fp32 models/injini_mn10_as_fp32.onnx --calib-dir data/dcase2025_dev --n-calib 256
-!python src/eval_dcase.py --root data/dcase2025_dev \
-    --backend onnx:models/injini_mn10_as_int8.onnx --scorer maha --out models/eval_mn10_int8_maha.json
+!python src/eval_dcase.py --root data/dcase2025_dev --backend onnx:models/injini_mn10_as_int8.onnx --scorer knn --whiten 128 --out models/eval_mn10_int8_knn_w128.json
 """)
 
 md("## 7. Smaller candidate — mn04_as, FP32 and INT8")
 code("""
 !python src/embedder.py --name mn04_as --out models/injini_mn04_as_fp32.onnx
-!python src/eval_dcase.py --root data/dcase2025_dev \
-    --backend onnx:models/injini_mn04_as_fp32.onnx --scorer maha --out models/eval_mn04_fp32_maha.json
+!python src/eval_dcase.py --root data/dcase2025_dev --backend onnx:models/injini_mn04_as_fp32.onnx --scorer knn --whiten 128 --out models/eval_mn04_fp32_knn_w128.json
 !python export/quantize.py --fp32 models/injini_mn04_as_fp32.onnx --calib-dir data/dcase2025_dev --n-calib 256
-!python src/eval_dcase.py --root data/dcase2025_dev \
-    --backend onnx:models/injini_mn04_as_int8.onnx --scorer maha --out models/eval_mn04_int8_maha.json
-""")
-
-md("## 8. kNN scorer cross-check (mn10_as FP32)")
-code("""
-!python src/eval_dcase.py --root data/dcase2025_dev \
-    --backend onnx:models/injini_mn10_as_fp32.onnx --scorer knn --out models/eval_mn10_fp32_knn.json
+!python src/eval_dcase.py --root data/dcase2025_dev --backend onnx:models/injini_mn04_as_int8.onnx --scorer knn --whiten 128 --out models/eval_mn04_int8_knn_w128.json
 """)
 
 md("## 9. Supervised fault-ID head (Kaggle engine-sounds, source-disjoint)")
@@ -171,20 +170,24 @@ for p in sorted(glob.glob("models/eval_*.json")) + sorted(glob.glob("models/faul
                  "official_score": d.get("official_score"),
                  "mean_auc": d.get("mean_auc"),
                  "macro_f1": d.get("macro_f1"),
+                 "mean_pauc": d.get("mean_pauc"),
+                 "whiten": d.get("whiten"),
                  "per_machine": d.get("per_machine")})
 quant = {os.path.basename(p): json.load(open(p)) for p in glob.glob("models/*_quant_report.json")}
 summary = {"generated": time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime()), "results": rows, "quant": quant}
-json.dump(summary, open("/kaggle/working/injini_metrics.json", "w"), indent=2)
+json.dump(summary, open(os.path.join(OUTDIR, "injini_metrics.json"), "w"), indent=2)
 
 for r in rows:
-    print(f"{r['file']:32s} official={r['official_score']}  mean_auc={r['mean_auc']}  macro_f1={r['macro_f1']}")
+    print(f"{r['file']:34s} official={r['official_score']}  mean_auc={r['mean_auc']}  "
+          f"mean_pauc={r.get('mean_pauc')}  macro_f1={r['macro_f1']}")
 print()
 for k, v in quant.items():
     print(k, {kk: v.get(kk) for kk in ("fp32_mb", "int8_mb", "size_ratio", "approx_macs")})
 
-for f in glob.glob("models/injini_*.onnx") + glob.glob("models/*_quant_report.json") + glob.glob("models/eval_*.json"):
-    shutil.copy(f, "/kaggle/working/")
-print("\\nworking:", sorted(os.listdir("/kaggle/working")))
+for f in (glob.glob("models/injini_*.onnx") + glob.glob("models/*_quant_report.json")
+          + glob.glob("models/eval_*.json") + glob.glob("models/faultid_*.json")):
+    shutil.copy(f, OUTDIR)
+print("\\nworking:", sorted(os.listdir(OUTDIR)))
 """)
 
 
