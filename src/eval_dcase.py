@@ -6,9 +6,9 @@ source and target healthy embeddings, score the test clips, compute source AUC,
 target AUC and partial AUC. The official score is the harmonic mean of all
 three across all machines.
 
-    python src/eval_dcase.py --root data/dcase2025_dev --backend torch:mn10_as --scorer maha
-    python src/eval_dcase.py --root data/dcase2025_dev --backend onnx:models/injini_mn10_as_int8.onnx --scorer knn
-    python src/eval_dcase.py --root data/dcase2025_dev --backend passt --whiten 0
+    python src/eval_dcase.py --backend torch:mn10_as --scorer knn          # HF mirror (default)
+    python src/eval_dcase.py --backend onnx:models/injini_mn10_as_int8.onnx --scorer knn
+    python src/eval_dcase.py --source dir --root data/dcase2025_dev --backend passt --whiten 0
 
 Writes a metrics JSON to models/eval_<tag>.json.
 """
@@ -26,34 +26,44 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _HERE)
 
 import features as F          # noqa: E402
-import dcase_data as D        # noqa: E402
 import metrics as M           # noqa: E402
 from anomaly import SCORERS, Whitener  # noqa: E402
 from embed_backends import get_backend  # noqa: E402
 
 
-def _load(paths: list[str]) -> list[np.ndarray]:
-    return [F.load_audio(p) for p in paths]
+def load_clips(source: str, root: str | None, machines, limit):
+    if source == "hf":
+        import dcase_hf as H
+        return H.load(machines=machines, limit=limit), H.by_machine
+    import dcase_data as D
+    return D.load(root, machines), D.by_machine
 
 
-def evaluate(root: str, backend_spec: str, scorer_name: str, whiten: int = 128,
-             machines=None, limit=None) -> dict:
+def waves_of(clips) -> list[np.ndarray]:
+    out = []
+    for c in clips:
+        if getattr(c, "wave", None) is not None:
+            out.append(c.wave)
+        else:
+            out.append(F.load_audio(c.path))
+    return out
+
+
+def evaluate(source: str, root: str | None, backend_spec: str, scorer_name: str,
+             whiten: int = 128, machines=None, limit=None) -> dict:
     backend = get_backend(backend_spec)
-    clips = D.load(root, machines)
+    clips, by_machine_fn = load_clips(source, root, machines, limit)
     if not clips:
-        raise SystemExit(f"no clips under {root}")
-    by_machine = D.by_machine(clips)
+        raise SystemExit("no clips loaded")
+    by_machine = by_machine_fn(clips)
     t0 = time.time()
 
-    # pass 1: embed every machine's training clips
     train_emb: dict[str, dict] = {}
     for machine, mclips in by_machine.items():
         train = [c for c in mclips if c.split == "train"]
-        if limit:
-            train = train[:limit]
         if not train:
             continue
-        emb = backend.embed(_load([c.path for c in train]))
+        emb = backend.embed(waves_of(train))
         train_emb[machine] = {
             "all": emb,
             "source": emb[[i for i, c in enumerate(train) if c.domain == "source"]],
@@ -61,21 +71,17 @@ def evaluate(root: str, backend_spec: str, scorer_name: str, whiten: int = 128,
         }
 
     whitener = None
-    if whiten and whiten > 0:
-        stack = np.vstack([v["all"] for v in train_emb.values()])
-        whitener = Whitener(whiten).fit(stack)
+    if whiten and whiten > 0 and train_emb:
+        whitener = Whitener(whiten).fit(np.vstack([v["all"] for v in train_emb.values()]))
 
     def wt(x):
         return whitener.transform(x) if whitener is not None else x
 
-    # pass 2: per machine
     per_machine: dict[str, dict] = {}
     for machine, mclips in by_machine.items():
         if machine not in train_emb:
             continue
         test = [c for c in mclips if c.split == "test"]
-        if limit:
-            test = test[:limit]
         if not test:
             continue
 
@@ -85,7 +91,7 @@ def evaluate(root: str, backend_spec: str, scorer_name: str, whiten: int = 128,
         scorer.fit(src if len(src) else wt(train_emb[machine]["all"]),
                    tgt if len(tgt) >= 2 else None)
 
-        te = wt(backend.embed(_load([c.path for c in test])))
+        te = wt(backend.embed(waves_of(test)))
         scores = scorer.score(te)
         y = np.array([c.label for c in test])
         dom = np.array([c.domain for c in test])
@@ -102,12 +108,10 @@ def evaluate(root: str, backend_spec: str, scorer_name: str, whiten: int = 128,
 
     aucs = [v["auc_source"] for v in per_machine.values()] + [v["auc_target"] for v in per_machine.values()]
     return {
-        "backend": backend_spec,
-        "scorer": scorer_name,
-        "whiten": whiten,
+        "backend": backend_spec, "scorer": scorer_name, "whiten": whiten, "source": source,
         "official_score": M.official_score(per_machine),
-        "mean_auc": float(np.nanmean(aucs)),
-        "mean_pauc": float(np.nanmean([v["pauc"] for v in per_machine.values()])),
+        "mean_auc": float(np.nanmean(aucs)) if aucs else float("nan"),
+        "mean_pauc": float(np.nanmean([v["pauc"] for v in per_machine.values()])) if per_machine else float("nan"),
         "per_machine": per_machine,
         "seconds": round(time.time() - t0, 1),
     }
@@ -115,16 +119,17 @@ def evaluate(root: str, backend_spec: str, scorer_name: str, whiten: int = 128,
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--root", required=True)
+    ap.add_argument("--source", default="hf", choices=["hf", "dir"])
+    ap.add_argument("--root", default=None)
     ap.add_argument("--backend", default="torch:mn10_as")
     ap.add_argument("--scorer", default="knn", choices=list(SCORERS))
-    ap.add_argument("--whiten", type=int, default=128, help="PCA-whiten dims; 0 disables")
+    ap.add_argument("--whiten", type=int, default=128)
     ap.add_argument("--machines", nargs="*", default=None)
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
-    res = evaluate(args.root, args.backend, args.scorer, args.whiten, args.machines, args.limit)
+    res = evaluate(args.source, args.root, args.backend, args.scorer, args.whiten, args.machines, args.limit)
     print(json.dumps({k: v for k, v in res.items() if k != "per_machine"}, indent=2))
 
     tag = (args.backend.replace(":", "_").replace("/", "_").replace("\\", "_").replace(".onnx", "")

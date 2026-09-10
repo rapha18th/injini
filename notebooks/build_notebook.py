@@ -33,6 +33,7 @@ INLINE_FILES = [
     "src/fetch_dcase.py",
     "src/prepare_engine_sounds.py",
     "src/faultid.py",
+    "src/dcase_hf.py",
     "export/quantize.py",
 ]
 
@@ -80,7 +81,7 @@ for rel in INLINE_FILES:
 
 md("## 2. Dependencies, EfficientAT code and weights")
 code("""
-!pip -q install onnx onnxruntime 2>/dev/null
+!pip -q install onnx onnxruntime "datasets>=2.19" 2>/dev/null
 !pip -q install hear21passt 2>/dev/null || echo "hear21passt install failed; PaSST reference row will be skipped"
 try:
     import torchaudio  # noqa: F401
@@ -106,17 +107,28 @@ F.dump_mel_matrix()
 print("mel matrix", os.path.exists("models/mel_kaldi_128x513.npy"))
 """)
 
-md("## 3. DCASE 2025 Task 2 development set (Zenodo 15097779, CC BY-NC-SA 4.0)")
+md("""
+## 3. DCASE 2025 Task 2 development set
+Read from the HuggingFace mirror `HTill/dcase2025_task2_dev` (Zenodo, the
+official host, has been returning 504s). Also dump 256 healthy training clips
+to a folder for the INT8 calibration pass.
+""")
 code("""
 t0 = time.time()
-!python src/fetch_dcase.py --out data/dcase2025_dev
-n = len(glob.glob("data/dcase2025_dev/*/*/*.wav"))
-print(f"{n} wav files in {time.time()-t0:.0f}s")
-assert n > 1000, "DCASE dev set did not download"
+import dcase_hf as H, soundfile as sf
+_clips = H.load()
+print(f"{len(_clips)} clips in {time.time()-t0:.0f}s")
+assert len(_clips) > 1000, "DCASE mirror did not load"
+os.makedirs("data/calib", exist_ok=True)
+cal = [c for c in _clips if c.split == "train"][:256]
+for i, c in enumerate(cal):
+    sf.write(f"data/calib/{i:03d}.wav", c.wave, F.SR)
+print("calibration wavs:", len(cal))
+del _clips
 """)
 
 md("## 4. Reproduce the DCASE autoencoder baseline")
-code("!python src/baseline_ae.py --root data/dcase2025_dev --epochs 100")
+code("!python src/baseline_ae.py --epochs 100")
 
 md("""
 ## 5. Reference ceiling — PaSST transformer embedding
@@ -124,7 +136,7 @@ The published state of the art in one reproducible form: a frozen transformer
 embedding with whitening plus a kNN distance.
 """)
 code("""
-!python src/eval_dcase.py --root data/dcase2025_dev --backend passt --scorer knn --whiten 128 \
+!python src/eval_dcase.py --backend passt --scorer knn --whiten 128 \
     --out models/eval_passt_knn_w128.json || echo "passt backend failed, continuing"
 """)
 
@@ -136,19 +148,19 @@ Mahalanobis variant and a no-whitening variant for the ablation.
 code("""
 !python src/embedder.py --name mn10_as --out models/injini_mn10_as_fp32.onnx
 FP=onnx:models/injini_mn10_as_fp32.onnx
-!python src/eval_dcase.py --root data/dcase2025_dev --backend $FP --scorer knn  --whiten 128 --out models/eval_mn10_fp32_knn_w128.json
-!python src/eval_dcase.py --root data/dcase2025_dev --backend $FP --scorer maha --whiten 128 --out models/eval_mn10_fp32_maha_w128.json
-!python src/eval_dcase.py --root data/dcase2025_dev --backend $FP --scorer knn  --whiten 0   --out models/eval_mn10_fp32_knn_w0.json
-!python export/quantize.py --fp32 models/injini_mn10_as_fp32.onnx --calib-dir data/dcase2025_dev --n-calib 256
-!python src/eval_dcase.py --root data/dcase2025_dev --backend onnx:models/injini_mn10_as_int8.onnx --scorer knn --whiten 128 --out models/eval_mn10_int8_knn_w128.json
+!python src/eval_dcase.py --backend $FP --scorer knn  --whiten 128 --out models/eval_mn10_fp32_knn_w128.json
+!python src/eval_dcase.py --backend $FP --scorer maha --whiten 128 --out models/eval_mn10_fp32_maha_w128.json
+!python src/eval_dcase.py --backend $FP --scorer knn  --whiten 0   --out models/eval_mn10_fp32_knn_w0.json
+!python export/quantize.py --fp32 models/injini_mn10_as_fp32.onnx --calib-dir data/calib --n-calib 256
+!python src/eval_dcase.py --backend onnx:models/injini_mn10_as_int8.onnx --scorer knn --whiten 128 --out models/eval_mn10_int8_knn_w128.json
 """)
 
 md("## 7. Smaller candidate — mn04_as, FP32 and INT8")
 code("""
 !python src/embedder.py --name mn04_as --out models/injini_mn04_as_fp32.onnx
-!python src/eval_dcase.py --root data/dcase2025_dev --backend onnx:models/injini_mn04_as_fp32.onnx --scorer knn --whiten 128 --out models/eval_mn04_fp32_knn_w128.json
-!python export/quantize.py --fp32 models/injini_mn04_as_fp32.onnx --calib-dir data/dcase2025_dev --n-calib 256
-!python src/eval_dcase.py --root data/dcase2025_dev --backend onnx:models/injini_mn04_as_int8.onnx --scorer knn --whiten 128 --out models/eval_mn04_int8_knn_w128.json
+!python src/eval_dcase.py --backend onnx:models/injini_mn04_as_fp32.onnx --scorer knn --whiten 128 --out models/eval_mn04_fp32_knn_w128.json
+!python export/quantize.py --fp32 models/injini_mn04_as_fp32.onnx --calib-dir data/calib --n-calib 256
+!python src/eval_dcase.py --backend onnx:models/injini_mn04_as_int8.onnx --scorer knn --whiten 128 --out models/eval_mn04_int8_knn_w128.json
 """)
 
 md("## 9. Supervised fault-ID head (Kaggle engine-sounds, source-disjoint)")
