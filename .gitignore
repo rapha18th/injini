@@ -1,7 +1,7 @@
 # data (downloaded, not committed)
 data/dcase2025_dev/
 data/_calib_synth/
-data/_fetch_*.log
+data/_*.log
 data/*.csv
 !data/.gitkeep
 
