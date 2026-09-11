@@ -192,6 +192,42 @@ artefact they belong to. The alternative — regenerate on demand — means the
 paper's reported numbers can silently drift from what's actually in the app's
 `assets/` folder.
 
+## ADR-10: A shared Kaggle input mount can silently contaminate a recursive glob
+
+**Context.** With ADR-5's fix (scan `/kaggle/input/*` for whichever directory
+holds wav files) in place, the fault-ID rerun completed and produced a number:
+macro F1 = 0.427 across 25 classes. Reading the class list caught the problem
+immediately: `Birds`, `Cats`, `Dogs`, `Door`, `Footsteps`, `Rain`, `Sirens`,
+`Thunder`, `Traffic`, `Wind`, `Silence`, and a bare `Data_Fixed` sat alongside
+the real fault classes.
+
+**Root cause.** `/kaggle/input/datasets` (the shared mount from ADR-5) held
+more than one attached dataset's files, and `prepare_engine_sounds.collect()`
+globbed `root/**/*.wav` unconditionally, then fell back to `parts[-2]` as the
+class name whenever a path didn't contain a `Data_Fixed` segment. Every wav
+from whatever unrelated environmental-sound dataset also shared that mount
+point got silently absorbed as a plausible-looking fault class. Separately, a
+doubly-nested `Data_Fixed/Data_Fixed/...` path (malformed upstream, or an
+artefact of the shared mount) produced a class literally named `Data_Fixed`.
+
+**Fix.** `collect()` now requires the literal `Data_Fixed` path segment to
+reject anything that isn't structurally this dataset, and explicitly rejects
+a path where the segment right after `Data_Fixed` is itself `Data_Fixed`
+(no class folder). Both rejection counts are printed. Verified locally against
+a synthetic tree combining a valid engine-sounds layout, a contaminating file
+from an unrelated dataset, and a malformed nested path — the fix keeps
+exactly the two legitimate files and reports the two it dropped.
+
+**Lesson.** A recursive glob rooted at a Kaggle input path is not safe to
+trust just because it found "enough" files of the right extension — a shared
+mount point means "enough wav files under this directory" does not mean "only
+this dataset's wav files under this directory". Validate structure, not just
+file count. And read the class list of any classifier trained on scraped
+labels before trusting its score; the wrong number here would have looked
+completely plausible (0.427 macro F1 across 25 classes reads fine at a glance)
+while actually measuring how easily an AudioSet embedder tells birdsong from
+piston slap, not fault identification.
+
 ## Results summary (for context; full table and narrative in Injini.docx §10)
 
 Five DCASE 2025 machine types (bearing, fan, gearbox, slider, valve), CPU,
@@ -214,9 +250,10 @@ five machine types, but a fair, matched comparison.
 
 ## Open items
 
-- **Fault-ID head**: no macro-F1 number yet. ADR-8's fix is in place; a lean
-  rerun (`notebooks/injini_faultid_only.ipynb`, kernel `injini-faultid`) was in
-  flight as of 2026-09-11.
+- **Fault-ID head**: the first clean number, 0.427 macro F1, turned out to be
+  over a contaminated 25-class problem (ADR-10). The fix is in and verified
+  against a synthetic tree; a rerun (`injini-faultid` kernel v2) was in flight
+  as of 2026-09-11.
 - **On-device measurement**: latency, execution-provider trace, memory,
   thermal, battery all need a real Galaxy M16 (or equivalent), not Kaggle.
 - **MAC counting**: `export/quantize.py`'s `onnx_macs()` is a rough Conv/Gemm

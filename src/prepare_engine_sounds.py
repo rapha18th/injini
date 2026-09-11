@@ -41,20 +41,39 @@ def source_key(stem: str) -> str:
 
 
 def collect(root: str) -> list[dict]:
+    """Only files under a literal Data_Fixed/<class>/... path count.
+
+    root is not trusted to be the engine-sounds dataset alone: on Kaggle it can
+    be a shared mount point (/kaggle/input/datasets) holding other attached
+    datasets too, glob(**/*.wav) picks all of them up, and a fallback class
+    name (parts[-2]) silently turns unrelated audio (birds, rain, traffic...)
+    into bogus fault classes. Requiring the Data_Fixed segment, and skipping a
+    file where the very next segment is itself "Data_Fixed" (a doubly-nested
+    path with no class folder), rejects everything that isn't really this
+    dataset instead of guessing a class for it.
+    """
     rows = []
     classes = set()
+    skipped_no_marker = skipped_bad_nesting = 0
     for wav in glob.glob(os.path.join(root, "**", "*.wav"), recursive=True):
         rel = os.path.relpath(wav, root).replace("\\", "/")
         parts = rel.split("/")
-        # .../<something>/Data_Fixed/<class>/<maybe Augmented>/<file>.wav
         try:
             di = parts.index("Data_Fixed")
             cls = parts[di + 1]
         except (ValueError, IndexError):
-            cls = parts[-2]
+            skipped_no_marker += 1
+            continue
+        if cls == "Data_Fixed" or di + 1 >= len(parts) - 1:
+            skipped_bad_nesting += 1
+            continue
         classes.add(cls)
         stem = os.path.splitext(parts[-1])[0]
         rows.append({"path": wav, "class_name": cls, "source_key": f"{cls}::{source_key(stem)}"})
+    if skipped_no_marker or skipped_bad_nesting:
+        print(f"  skipped {skipped_no_marker} files with no Data_Fixed path segment "
+              f"(likely another dataset sharing the mount), "
+              f"{skipped_bad_nesting} with a malformed nested path")
     labels = {c: i for i, c in enumerate(sorted(classes))}
     for r in rows:
         r["label"] = labels[r["class_name"]]
