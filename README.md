@@ -68,7 +68,13 @@ cd android && ./gradlew assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Two flows: **Enrol** records six healthy ten-second clips of a machine and stores its fingerprint; **Check** records one clip and returns a three-tier verdict. The "Full model results" dialog shows the matched FP32-vs-INT8 embedder benchmark and the execution-provider trace, same methodology as SiloSense. Custom adaptive icon: a five-bar amber waveform on the app's own instrument-panel dark ground, not a placeholder.
+A named-machine fleet, not one hardcoded scorer: tap the machine row to select or add one (`MachineRegistry.kt`, one JSON file, same shape as TapSense's vessel registry). Three flows, all against whichever machine is selected:
+
+- **Enrol** records six healthy ten-second clips and stores that machine's own fingerprint.
+- **Check** records one clip and returns a three-tier verdict against it.
+- **Add training clip** records one clip and saves it labelled — healthy after a service, or faulty with a mechanic's verdict against the fault-ID head's own class list (`FaultLabel.kt`) — as a real WAV plus a manifest row shaped like `prepare_engine_sounds.py` already expects (`LabeledClipStore.kt`). This is the field data-collection tool the working paper's Section 09 once imagined as separate software, built into the same app instead.
+
+Every recording drives a live waveform and a counting-down status line (`WaveformView.kt`) instead of a frozen screen for the full ten seconds. The "Full model results" dialog shows the matched FP32-vs-INT8 embedder benchmark and the execution-provider trace, same methodology as SiloSense. Custom adaptive icon: a five-bar amber waveform on the app's own instrument-panel dark ground, not a placeholder.
 
 Feature parity (Kotlin vs the Python reference):
 

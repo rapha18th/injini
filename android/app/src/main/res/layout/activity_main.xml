@@ -43,6 +43,23 @@
         app:layout_constraintTop_toBottomOf="@id/wordmark"
         app:layout_constraintStart_toStartOf="parent" />
 
+    <!-- Tap to switch machines or add a new one. Icon-free by design: a
+         one-line text row reads as a control without extra chrome. -->
+    <TextView
+        android:id="@+id/machineRow"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="28dp"
+        android:background="@drawable/bg_chip"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="10dp"
+        android:text="Machine: none selected  ›"
+        android:textColor="@color/injini_text"
+        android:textSize="14sp"
+        app:layout_constraintTop_toBottomOf="@id/tagline"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
     <TextView
         android:id="@+id/statusWord"
         android:layout_width="0dp"
@@ -52,10 +69,10 @@
         android:textSize="30sp"
         android:textStyle="bold"
         android:letterSpacing="0.02"
-        app:layout_constraintTop_toBottomOf="@id/tagline"
+        app:layout_constraintTop_toBottomOf="@id/machineRow"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="72dp" />
+        android:layout_marginTop="32dp" />
 
     <TextView
         android:id="@+id/detailText"
@@ -83,6 +100,19 @@
         android:textSize="12sp"
         app:layout_constraintTop_toBottomOf="@id/detailText"
         app:layout_constraintStart_toStartOf="parent" />
+
+    <!-- Hidden until a recording starts; see MainActivity.showRecordingUi().
+         A live level meter so a ten-second clip shows something moving on
+         screen instead of a status line frozen for the whole duration. -->
+    <com.injini.app.WaveformView
+        android:id="@+id/waveform"
+        android:layout_width="0dp"
+        android:layout_height="72dp"
+        android:layout_marginTop="28dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/latencyChip"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
     <!--
       Plain AppCompatButton, not <Button> — the Material Components theme
@@ -114,6 +144,21 @@
         android:background="@drawable/bg_button"
         android:text="@string/enrol"
         android:textColor="@color/injini_text"
+        android:textSize="14sp"
+        android:letterSpacing="0.06"
+        android:stateListAnimator="@null"
+        app:layout_constraintBottom_toTopOf="@id/addClipButton"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginBottom="10dp" />
+
+    <androidx.appcompat.widget.AppCompatButton
+        android:id="@+id/addClipButton"
+        android:layout_width="0dp"
+        android:layout_height="52dp"
+        android:background="@drawable/bg_button"
+        android:text="@string/add_training_clip"
+        android:textColor="@color/injini_green"
         android:textSize="14sp"
         android:letterSpacing="0.06"
         android:stateListAnimator="@null"

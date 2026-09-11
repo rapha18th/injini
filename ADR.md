@@ -315,6 +315,49 @@ failed twice. And a one-line insets fix is not automatically an equivalent
 fix — `fitsSystemWindows` and a manual insets listener solve the same overlap
 problem through different mechanisms with different side effects.
 
+## ADR-14: fleet capability and real recording feedback, in the app itself
+
+**Context.** Two gaps, raised directly: a ten-second recording showed a
+status line that never changed until the clip ended, reading as a stuck
+screen; and the app only ever knew one hardcoded "machine", with no way to
+name a fleet, and no way to collect the labelled data the fault-ID head
+(Section 09's secondary mode) actually needs to improve past 0.362 macro F1.
+A follow-up correction: any data collection had to point at real supervised
+retraining, not just sit as loose recordings.
+
+**Decision.**
+
+- `WaveformView.kt`: a live level meter in the same five-bar shape as the app
+  icon, fed by `AudioCapture.record()`'s new per-chunk `onProgress` callback
+  (RMS level plus elapsed fraction). Every recording, Enrol, Check or a
+  labelled clip, now drives the waveform and a live "N s remaining" line
+  through one shared `recordWithFeedback()` path, so none of them can regress
+  independently back to a frozen screen.
+- `MachineRegistry.kt`, the same JSON-registry shape as TapSense's
+  `VesselRegistry`: named machines, each with its own persisted
+  `AnomalyScorer`, check count and last verdict, and a per-label count of
+  training clips collected. Enrol and Check now operate on whichever machine
+  is selected, not a single global scorer in SharedPreferences.
+- `FaultLabel.kt` + `LabeledClipStore.kt`: "Add training clip" records one
+  clip and saves it as a real WAV plus a manifest row shaped exactly like
+  `prepare_engine_sounds.py`'s existing columns (`path, label, class_name,
+  source_key, split, ...`), with the machine id as `source_key` — the same
+  unit that script already splits on. The label set is the corpus's own
+  fault classes (including its "Engine kanocking" typo, preserved on purpose
+  so a clip joins the existing class instead of forking a near-duplicate
+  one), plus a free-text "Other" path so a fault this taxonomy has no name
+  for yet gets kept, not discarded. The point of this shape is that `adb
+  pull` of one directory is the entire step between a phone in the field and
+  a retrain, not a separate export tool to design later.
+
+**Verified on-device**, Samsung SM-M075F: a full 6-clip Enrol cycle (waveform
+correctly resets and re-shows between clips, no hang, no crash), a Check, and
+an "Add training clip" run end to end — machine created, fault selected,
+mechanic's verdict typed, clip recorded with a live waveform and countdown,
+saved. The written WAV opens cleanly in Python's stdlib `wave` module (mono,
+16-bit, 16 kHz, exactly 10.0 s) and the manifest row carries the real device
+model, capture source (`UNPROCESSED`), and the machine id as source key.
+
 ## Results summary (for context; full table and narrative in Injini.docx §10)
 
 Five DCASE 2025 machine types (bearing, fan, gearbox, slider, valve), CPU,

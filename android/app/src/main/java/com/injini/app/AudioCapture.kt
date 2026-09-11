@@ -5,6 +5,7 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import kotlin.math.sqrt
 
 /**
  * Records mono 16 kHz PCM from the least-processed source Android will give us.
@@ -29,11 +30,18 @@ class AudioCapture {
         const val SAMPLE_RATE = 16_000
     }
 
-    fun record(seconds: Double): Recording {
+    /**
+     * Records [seconds] of audio. [onProgress], if given, is called on the
+     * calling (capture) thread after every chunk read with the chunk's RMS
+     * level (0..1, silence to clipping) and the elapsed fraction (0..1) of the
+     * requested duration — a UI can use these to drive a live waveform and a
+     * countdown instead of a status line that sits frozen for the whole clip.
+     */
+    fun record(seconds: Double, onProgress: ((level: Float, elapsedFraction: Float) -> Unit)? = null): Recording {
         val (record, source) = open()
         val total = (SAMPLE_RATE * seconds).toInt()
         val out = FloatArray(total)
-        val buf = ByteArray(4096)
+        val buf = ByteArray(2048)
         record.startRecording()
         var written = 0
         try {
@@ -41,10 +49,21 @@ class AudioCapture {
                 val n = record.read(buf, 0, buf.size)
                 if (n <= 0) break
                 val sb = ByteBuffer.wrap(buf, 0, n).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
+                var sumSq = 0.0
                 var i = 0
                 while (i < n / 2 && written < total) {
-                    out[written++] = sb.get(i) / 32768f
+                    val s = sb.get(i) / 32768f
+                    out[written++] = s
+                    sumSq += (s * s).toDouble()
                     i++
+                }
+                if (onProgress != null && i > 0) {
+                    val rms = sqrt(sumSq / i).toFloat()
+                    // A quiet room reads near 0.01-0.03 RMS; scale so ordinary
+                    // background sound already shows some motion on the meter
+                    // instead of a flat line until the machine is genuinely loud.
+                    val level = (rms * 12f).coerceIn(0f, 1f)
+                    onProgress(level, (written.toFloat() / total).coerceIn(0f, 1f))
                 }
             }
         } finally {
