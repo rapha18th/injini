@@ -29,8 +29,9 @@ import kotlin.concurrent.thread
  *           show a three-tier verdict, and save the clip with that
  *           provisional tier as a hint. What Check does NOT know is the real
  *           answer — that comes from a mechanic, later — so the clip queues
- *           in [LabeledClipStore.savePending] until someone visits the
- *           machine list and says what actually turned out to be true.
+ *           in [LabeledClipStore.savePending] until "Add verdict" is used,
+ *           right here or from the fleet screen, to say what actually
+ *           turned out to be true.
  *
  * Every recording, of either kind, runs through [recordWithFeedback], which
  * drives a live [WaveformView] and a counting-down status line so a
@@ -54,7 +55,10 @@ class MainActivity : AppCompatActivity() {
         if (result.resultCode == RESULT_OK && id != null) selectMachine(id)
     }
 
-    private lateinit var machineRow: TextView
+    private lateinit var machinePicker: TextView
+    private lateinit var machinesButton: Button
+    private lateinit var machineInfo: TextView
+    private lateinit var addVerdictButton: Button
     private lateinit var statusWord: TextView
     private lateinit var detailText: TextView
     private lateinit var latencyChip: TextView
@@ -66,6 +70,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var features: AudioFeatures
     private lateinit var registry: MachineRegistry
     private lateinit var clipStore: LabeledClipStore
+    private lateinit var verdictFlow: VerdictFlow
     private var embedder: InjiniEmbedder? = null
     private var fp32Embedder: InjiniEmbedder? = null
     private val capture = AudioCapture()
@@ -82,7 +87,10 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         applySystemBarInsetsAsExtraPadding()
-        machineRow = findViewById(R.id.machineRow)
+        machinePicker = findViewById(R.id.machinePicker)
+        machinesButton = findViewById(R.id.machinesButton)
+        machineInfo = findViewById(R.id.machineInfo)
+        addVerdictButton = findViewById(R.id.addVerdictButton)
         statusWord = findViewById(R.id.statusWord)
         detailText = findViewById(R.id.detailText)
         latencyChip = findViewById(R.id.latencyChip)
@@ -94,6 +102,7 @@ class MainActivity : AppCompatActivity() {
         features = AudioFeatures(this)
         registry = MachineRegistry(this)
         clipStore = LabeledClipStore(this)
+        verdictFlow = VerdictFlow(this, registry, clipStore, onChanged = { machineId?.let { refreshMachineInfo(it) } })
 
         thread {
             val e = InjiniEmbedder(this, "injini_mn10_as_int8.onnx")
@@ -101,7 +110,9 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread { embedder = e; restoreLastMachine(); setIdle() }
         }
 
-        machineRow.setOnClickListener { openMachineList() }
+        machinePicker.setOnClickListener { showMachinePickerDropdown() }
+        machinesButton.setOnClickListener { pickMachine.launch(Intent(this, MachineListActivity::class.java)) }
+        addVerdictButton.setOnClickListener { machineId?.let { verdictFlow.showQueue(it) } }
         checkButton.setOnClickListener { ensureMic { withMachine { runCheck() } } }
         enrolButton.setOnClickListener { ensureMic { withMachine { runEnrol() } } }
         resultsLink.setOnClickListener { showResults() }
@@ -110,7 +121,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         // Attributes or pending counts may have changed in the machine list.
-        machineId?.let { refreshMachineRow(it) }
+        machineId?.let { refreshMachineInfo(it) }
     }
 
     /**
@@ -139,9 +150,9 @@ class MainActivity : AppCompatActivity() {
             == PackageManager.PERMISSION_GRANTED) then() else askMic.launch(Manifest.permission.RECORD_AUDIO)
     }
 
-    /** Runs [then] if a machine is already selected, otherwise opens the fleet screen first. */
+    /** Runs [then] if a machine is already selected, otherwise opens the dropdown to pick or add one. */
     private fun withMachine(then: () -> Unit) {
-        if (machineId != null) then() else openMachineList()
+        if (machineId != null) then() else showMachinePickerDropdown()
     }
 
     // ---------------------------------------------------------------- machines
@@ -154,18 +165,46 @@ class MainActivity : AppCompatActivity() {
     private fun selectMachine(id: String) {
         machineId = id
         scorer = registry.find(id)?.scorerJson?.let { runCatching { AnomalyScorer.fromJson(it) }.getOrNull() }
-        refreshMachineRow(id)
+        refreshMachineInfo(id)
         getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_LAST_MACHINE, id).apply()
         setIdle()
     }
 
-    private fun refreshMachineRow(id: String) {
+    /** Updates the picker label, the inline attributes/progress card, and the Add verdict button — all from the registry, every time something might have changed. */
+    private fun refreshMachineInfo(id: String) {
+        val m = registry.find(id) ?: return
+        machinePicker.text = "Machine: $id  ⌄"
+
+        val enrolled = m.scorerJson != null
+        val total = registry.totalLabeledClips(id)
+        machineInfo.visibility = View.VISIBLE
+        machineInfo.text = "${m.engineType} · ${m.category}\n" +
+            "${if (enrolled) "Enrolled" else "Not enrolled"}  ·  ${m.checkCount} checks  ·  $total training clips"
+
         val pending = clipStore.pendingCount(id)
-        machineRow.text = if (pending > 0) "Machine: $id  ·  $pending awaiting a verdict  ›" else "Machine: $id  ›"
+        if (pending > 0) {
+            addVerdictButton.visibility = View.VISIBLE
+            addVerdictButton.text = "⚠  $pending recording${if (pending == 1) "" else "s"} — Add verdict"
+        } else {
+            addVerdictButton.visibility = View.GONE
+        }
     }
 
-    private fun openMachineList() {
-        pickMachine.launch(Intent(this, MachineListActivity::class.java))
+    /** The "dropdown": every known machine, then "+ Add new machine" — styled as a picker even though it is an AlertDialog under the hood, to stay visually consistent with the rest of the app rather than fighting a stock Spinner's chrome. */
+    private fun showMachinePickerDropdown() {
+        val known = registry.knownIds()
+        val options = known + "+ Add new machine"
+        AlertDialog.Builder(this)
+            .setTitle("Machine")
+            .setItems(options.toTypedArray()) { _, which ->
+                if (which == known.size) {
+                    MachineForms.showAddMachineDialog(this, registry) { id -> selectMachine(id) }
+                } else {
+                    selectMachine(known[which])
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     // ------------------------------------------------------------ recording UX
@@ -178,7 +217,7 @@ class MainActivity : AppCompatActivity() {
     private fun recordWithFeedback(seconds: Double, title: String, detail: String): AudioCapture.Recording {
         runOnUiThread {
             waveform.visibility = View.VISIBLE
-            waveform.reset()
+            waveform.start()
             status(title, detail)
         }
         try {
@@ -190,7 +229,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         } finally {
-            runOnUiThread { waveform.visibility = View.GONE }
+            runOnUiThread { waveform.stop(); waveform.visibility = View.GONE }
         }
     }
 
@@ -209,8 +248,11 @@ class MainActivity : AppCompatActivity() {
     private fun setIdle() {
         refreshButtons()
         when {
-            machineId == null ->
-                status("PICK A MACHINE", "Tap the machine row above to add one or choose from your fleet.")
+            machineId == null -> {
+                machineInfo.visibility = View.GONE
+                addVerdictButton.visibility = View.GONE
+                status("PICK A MACHINE", "Tap the machine row above to select or add one.")
+            }
             scorer == null ->
                 status("NOT ENROLLED", "Enrol $machineId first: $ENROL_CLIPS ten-second clips while it runs normally. Every clip also joins the training corpus as healthy.")
             else ->
@@ -249,7 +291,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 val s = AnomalyScorer.enroll(healthy)
                 registry.saveScorer(id, s.toJson())
-                runOnUiThread { scorer = s; setIdle() }
+                runOnUiThread { scorer = s; refreshMachineInfo(id); setIdle() }
             } catch (ex: Exception) {
                 runOnUiThread { status("ENROL FAILED", ex.message ?: "unknown error"); setIdle() }
             }
@@ -278,7 +320,7 @@ class MainActivity : AppCompatActivity() {
                 registry.recordCheck(id, r.tier.name, MachineRegistry.nowIso())
                 // What Check knows right now is a model guess, not a verdict. The
                 // clip is saved and queued; the real label — healthy confirmed, or
-                // a mechanic's actual finding — comes later from the machine list.
+                // a mechanic's actual finding — comes later via Add verdict.
                 clipStore.savePending(
                     pcm = rec.pcm, sampleRate = rec.sampleRate, machineId = id,
                     engineType = m.engineType, category = m.category,
@@ -299,8 +341,8 @@ class MainActivity : AppCompatActivity() {
                     else ""
                     status(word, "$line\n\nscore ${"%.3f".format(r.score)}  " +
                         "(kNN ${"%.3f".format(r.knnDistance)}, Mahalanobis ${"%.3f".format(r.mahalanobis)})$src\n\n" +
-                        "Saved. When you know what this really was, open the machine list to label it.")
-                    refreshMachineRow(id)
+                        "Saved. Use Add verdict above once you know what this really was.")
+                    refreshMachineInfo(id)
                     refreshButtons()
                 }
             } catch (ex: Exception) {

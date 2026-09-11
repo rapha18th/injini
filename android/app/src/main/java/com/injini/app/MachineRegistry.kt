@@ -65,6 +65,8 @@ class MachineRegistry(context: Context) {
 
     fun idExists(id: String): Boolean = find(id) != null
 
+    fun knownIds(): List<String> = all().map { it.id }.sortedBy { it.lowercase() }
+
     /** Creates a new machine with full attributes. Overwrites nothing if the id already exists. */
     fun addMachine(id: String, engineType: String, category: String, notes: String, nowUtc: String): Boolean {
         val trimmed = id.trim()

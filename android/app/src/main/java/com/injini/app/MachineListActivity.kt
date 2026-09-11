@@ -5,11 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
-import android.widget.ArrayAdapter
-import android.widget.EditText
 import android.widget.LinearLayout
-import android.widget.RadioGroup
-import android.widget.Spinner
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -19,14 +15,17 @@ import androidx.core.view.WindowInsetsCompat
 /**
  * The fleet screen. A kombi rank or a generator dealer has many machines on
  * one phone, each with its own attributes and its own contribution to the
- * training corpus — this is where that is managed, not a name typed into a
- * one-line dialog on the main screen.
+ * training corpus — this is where that is managed.
  *
- * Tapping a machine selects it and returns to [MainActivity]
- * ([Activity.RESULT_OK] with [EXTRA_SELECTED_ID]). Long-pressing a row
- * offers to delete that machine's registry entry (its recordings on disk are
- * untouched, since they already belong to the corpus regardless of what
- * happens to the live scorer).
+ * Tapping a machine's name/status area always selects it and returns to
+ * [MainActivity] ([Activity.RESULT_OK] with [EXTRA_SELECTED_ID]) — that used
+ * to be hijacked into opening the pending-verdict queue whenever one
+ * existed, which made picking an already-enrolled machine impossible without
+ * first dismissing something worded like a decline. Reviewing pending
+ * recordings is now its own clearly labelled button on the row, wired
+ * through the same [VerdictFlow] the home screen's "Add verdict" button
+ * uses. Long-pressing a row offers to delete that machine's registry entry;
+ * its recordings on disk are untouched.
  */
 class MachineListActivity : AppCompatActivity() {
 
@@ -37,6 +36,7 @@ class MachineListActivity : AppCompatActivity() {
     private lateinit var registry: MachineRegistry
     private lateinit var clipStore: LabeledClipStore
     private lateinit var listContainer: LinearLayout
+    private lateinit var verdictFlow: VerdictFlow
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,8 +44,11 @@ class MachineListActivity : AppCompatActivity() {
         applyInsets()
         registry = MachineRegistry(this)
         clipStore = LabeledClipStore(this)
+        verdictFlow = VerdictFlow(this, registry, clipStore, onChanged = { refreshList() })
         listContainer = findViewById(R.id.machineList)
-        findViewById<View>(R.id.addMachineButton).setOnClickListener { showAddMachineDialog() }
+        findViewById<View>(R.id.addMachineButton).setOnClickListener {
+            MachineForms.showAddMachineDialog(this, registry) { id -> selectAndReturn(id) }
+        }
         refreshList()
     }
 
@@ -90,17 +93,16 @@ class MachineListActivity : AppCompatActivity() {
                 append("  ·  $total training clips")
                 if (m.lastVerdict != null) append("  ·  last: ${m.lastVerdict.lowercase()}")
             }
+            row.findViewById<View>(R.id.rowSelectArea).setOnClickListener { selectAndReturn(m.id) }
 
             val pending = clipStore.pendingCount(m.id)
             val pendingView = row.findViewById<TextView>(R.id.rowPending)
             if (pending > 0) {
                 pendingView.visibility = View.VISIBLE
-                pendingView.text = "$pending recording${if (pending == 1) "" else "s"} waiting for a verdict — tap to label"
+                pendingView.text = "⚠  $pending recording${if (pending == 1) "" else "s"} need${if (pending == 1) "s" else ""} a verdict  —  Add verdict ›"
+                pendingView.setOnClickListener { verdictFlow.showQueue(m.id) }
             }
 
-            row.setOnClickListener {
-                if (pending > 0) showPendingQueue(m.id) else selectAndReturn(m.id)
-            }
             row.setOnLongClickListener { confirmDelete(m.id); true }
             listContainer.addView(row)
         }
@@ -117,86 +119,6 @@ class MachineListActivity : AppCompatActivity() {
             .setMessage("Its enrolled fingerprint is deleted. Training clips already saved to disk are kept — they still belong to the corpus.")
             .setPositiveButton("Remove") { _, _ -> registry.delete(id); refreshList() }
             .setNegativeButton("Cancel", null)
-            .show()
-    }
-
-    // ------------------------------------------------------------ add machine
-
-    private fun showAddMachineDialog() {
-        val view = LayoutInflater.from(this).inflate(R.layout.dialog_add_machine, null)
-        val nameInput = view.findViewById<EditText>(R.id.nameInput)
-        val engineGroup = view.findViewById<RadioGroup>(R.id.engineTypeGroup)
-        val categorySpinner = view.findViewById<Spinner>(R.id.categorySpinner)
-        val notesInput = view.findViewById<EditText>(R.id.notesInput)
-        categorySpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, MachineRegistry.Category.ALL)
-
-        AlertDialog.Builder(this)
-            .setTitle("Add a machine")
-            .setView(view)
-            .setPositiveButton("Add") { _, _ ->
-                val id = nameInput.text.toString().trim()
-                if (id.isEmpty()) return@setPositiveButton
-                val engineType = when (engineGroup.checkedRadioButtonId) {
-                    R.id.radioPetrol -> MachineRegistry.EngineType.PETROL
-                    R.id.radioDiesel -> MachineRegistry.EngineType.DIESEL
-                    else -> MachineRegistry.EngineType.UNKNOWN
-                }
-                val category = categorySpinner.selectedItem as? String ?: MachineRegistry.Category.OTHER
-                val added = registry.addMachine(id, engineType, category, notesInput.text.toString().trim(), MachineRegistry.nowIso())
-                if (added) selectAndReturn(id) else {
-                    android.widget.Toast.makeText(this, "\"$id\" already exists", android.widget.Toast.LENGTH_SHORT).show()
-                    refreshList()
-                }
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
-    }
-
-    // --------------------------------------------------------- pending queue
-
-    private fun showPendingQueue(machineId: String) {
-        val pending = clipStore.listPending(machineId)
-        if (pending.isEmpty()) { selectAndReturn(machineId); return }
-
-        val names = pending.map { "Recorded ${it.recordedAtUtc.take(16).replace('T', ' ')}  —  model said: ${it.provisionalTier.lowercase()}" }
-        AlertDialog.Builder(this)
-            .setTitle("$machineId — recordings awaiting a verdict")
-            .setItems(names.toTypedArray()) { _, which -> showLabelDialog(pending[which]) }
-            .setNegativeButton("Not now") { _, _ -> selectAndReturn(machineId) }
-            .show()
-    }
-
-    private fun showLabelDialog(pending: LabeledClipStore.PendingClip) {
-        val view = LayoutInflater.from(this).inflate(R.layout.dialog_label_clip, null)
-        val group = view.findViewById<RadioGroup>(R.id.labelKindGroup)
-        val radioFaulty = view.findViewById<android.widget.RadioButton>(R.id.radioFaulty)
-        val spinner = view.findViewById<Spinner>(R.id.faultSpinner)
-        val verdictInput = view.findViewById<EditText>(R.id.verdictInput)
-        spinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, FaultLabel.faultyDisplayOptions())
-        group.setOnCheckedChangeListener { _, _ ->
-            val faulty = radioFaulty.isChecked
-            spinner.visibility = if (faulty) View.VISIBLE else View.GONE
-            verdictInput.visibility = if (faulty) View.VISIBLE else View.GONE
-        }
-
-        AlertDialog.Builder(this)
-            .setTitle("What turned out to be true?")
-            .setMessage("This recording's model guess was \"${pending.provisionalTier.lowercase()}\" — say what the mechanic actually found.")
-            .setView(view)
-            .setPositiveButton("Save label") { _, _ ->
-                val faulty = radioFaulty.isChecked
-                val display = if (faulty) spinner.selectedItem as? String ?: FaultLabel.OTHER_DISPLAY else FaultLabel.HEALTHY_DISPLAY
-                val verdict = if (faulty) verdictInput.text.toString() else ""
-                val corpusLabel = if (faulty) FaultLabel.corpusKeyFor(display, verdict) else FaultLabel.HEALTHY_CORPUS_KEY
-                clipStore.confirmPending(pending, corpusLabel, display, verdict)
-                registry.recordLabeledClip(pending.machineId, corpusLabel)
-                refreshList()
-            }
-            .setNeutralButton("Discard recording") { _, _ ->
-                clipStore.discardPending(pending)
-                refreshList()
-            }
-            .setNegativeButton("Later", null)
             .show()
     }
 }

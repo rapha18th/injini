@@ -407,6 +407,67 @@ WAV physically moved out of `_pending/` into `Alternator Bearing Noise/`, the
 pending row was removed, and the confirmed manifest row carried the real
 verdict text and the machine's engine type and category.
 
+## ADR-16: four direct UX corrections after actually using ADR-15's design
+
+**Context.** ADR-15 shipped, and using it surfaced four real problems the
+build-and-screenshot loop alone had not caught, because none of them are
+bugs — the app did exactly what its code said, and what its code said was
+wrong. Fixed all four together since they touch the same few files.
+
+**1. The waveform looked dead in a quiet room.** `WaveformView` only ever
+drew what the microphone actually measured, and an ordinary quiet recording
+site (most of them) sits close enough to silence that the bars barely
+moved — technically live, indistinguishable from stuck at a glance. Fixed
+with a continuous idle animation independent of the microphone signal: a
+slow travelling ripple across the bars (`Handler.postDelayed` every 45ms,
+`sin(phase*0.12 + i*0.35)` per bar) plus a breathing REC dot in the corner,
+both running the entire time a recording is in progress. Real audio now
+rides on top of that floor rather than being the only source of motion.
+Verified with two screenshots taken about a second apart during a live
+Check: the ripple pattern visibly shifted between them.
+
+**2 and 3. Adding a machine, and seeing what you already know about one,
+both required leaving the home screen — and the old plain-text "Machine: X"
+row gave no visual signal it was interactive at all.** Both fixed together:
+the row is now worded and styled as a dropdown ("Select or add a machine
+⌄"), and tapping it lists every known machine plus a trailing "+ Add new
+machine" row — reached from the home screen directly, no detour through the
+fleet screen required. Selecting a machine now populates an inline info card
+right there on the home screen (engine type, category, enrolled state,
+check count, training clip count) instead of requiring a trip to
+`MachineListActivity` just to see it. A separate, always-visible "Machines"
+button still opens the full fleet screen for management (delete, and
+reviewing every machine's queue in one place) — it was never folded into the
+dropdown, so managing the fleet is never a hidden side effect of picking
+from it.
+
+**4. "Not now" on the pending-verdict dialog read as declining the only way
+to select an already-enrolled machine from the list.** The actual bug:
+`MachineListActivity`'s row `onClickListener` checked `if (pending > 0)
+showPendingQueue(...) else selectAndReturn(...)` — so tapping any row with a
+pending recording never selected it; it forced the pending dialog open
+first, and "Not now" was the only path back to selecting, worded like a
+decline for what was actually the sole route to the primary action. Fixed
+by splitting the row into two independent tap targets: the name/status area
+always calls `selectAndReturn` and nothing else, and reviewing pending
+recordings is now its own visibly button-shaped element within the row
+("⚠ N recordings need a verdict — Add verdict ›", chip-styled, its own
+`OnClickListener`). The same fix applies on the home screen: the new
+`addVerdictButton` is a real `AppCompatButton`, not text carrying an
+implication.
+
+**New shared code**, to keep the two entry points (home screen, fleet
+screen) from drifting: `MachineForms.showAddMachineDialog()` (the add-machine
+form) and `VerdictFlow` (the pending-queue list plus the label dialog) are
+each defined once and used from both `MainActivity` and
+`MachineListActivity`.
+
+**Verified on-device**: switching machines from the home-screen dropdown
+correctly repopulates the info card and the Add-verdict button's
+visibility; tapping a Machines-list row with 3 pending recordings selects
+that machine immediately, with no dialog in the way; tapping its separate
+"Add verdict" chip opens the queue as before.
+
 ## Results summary (for context; full table and narrative in Injini.docx §10)
 
 Five DCASE 2025 machine types (bearing, fan, gearbox, slider, valve), CPU,

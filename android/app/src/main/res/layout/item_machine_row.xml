@@ -7,35 +7,53 @@
     android:orientation="vertical"
     android:padding="16dp">
 
-    <TextView
-        android:id="@+id/rowName"
+    <!-- Tapping this area selects the machine. This is the only thing tapping
+         it does — it never gets hijacked into opening another dialog, since
+         that made "pick this machine" impossible to do without first
+         dismissing something that sounded like a decline. -->
+    <LinearLayout
+        android:id="@+id/rowSelectArea"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textColor="@color/injini_text"
-        android:textSize="16sp"
-        android:textStyle="bold" />
+        android:orientation="vertical"
+        android:clickable="true"
+        android:focusable="true">
 
-    <TextView
-        android:id="@+id/rowType"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
-        android:textColor="@color/injini_dim"
-        android:textSize="13sp" />
+        <TextView
+            android:id="@+id/rowName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/injini_text"
+            android:textSize="16sp"
+            android:textStyle="bold" />
 
-    <TextView
-        android:id="@+id/rowStatus"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:textColor="@color/injini_green"
-        android:textSize="13sp" />
+        <TextView
+            android:id="@+id/rowType"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textColor="@color/injini_dim"
+            android:textSize="13sp" />
 
+        <TextView
+            android:id="@+id/rowStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textColor="@color/injini_green"
+            android:textSize="13sp" />
+    </LinearLayout>
+
+    <!-- A separate, visibly button-shaped tap target for reviewing pending
+         recordings — not text that merely hints it might be clickable. -->
     <TextView
         android:id="@+id/rowPending"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/bg_chip"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="10dp"
         android:textColor="@color/injini_amber"
         android:textSize="13sp"
         android:textStyle="bold"
