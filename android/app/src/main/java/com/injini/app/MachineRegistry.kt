@@ -6,21 +6,39 @@ import org.json.JSONObject
 import java.io.File
 
 /**
- * On-device register of every machine this phone has enrolled or collected
- * training clips for, one JSON file, same shape as TapSense's VesselRegistry.
+ * On-device register of every machine this phone has enrolled, one JSON
+ * file, same shape as TapSense's VesselRegistry.
  *
- * A machine used to be a single hardcoded name with one scorer in
- * SharedPreferences. That could not support a fleet: a kombi rank or a
- * generator dealer needs many named machines, each with its own healthy
- * fingerprint, on one phone. The registry also tracks how many labelled
- * training clips have been collected per machine per label, because that
- * count is what "the training corpus is thin" turns into "here is a fleet
- * conversation's worth of real data" — see [LabeledClipStore].
+ * Engine type and category are not cosmetic fields. A rod knock sounds
+ * different on a diesel compression-ignition engine than on a petrol
+ * spark-ignition one, and a generator's fixed governed speed makes its
+ * order structure nothing like a vehicle's. A future retrain needs to know
+ * which population a clip came from, or it will happily learn "diesel"
+ * where it meant "faulty." These fields are copied onto every clip this
+ * machine produces — see [LabeledClipStore].
  */
 class MachineRegistry(context: Context) {
 
+    object EngineType {
+        const val PETROL = "Petrol"
+        const val DIESEL = "Diesel"
+        const val UNKNOWN = "Unknown"
+        val ALL = listOf(PETROL, DIESEL, UNKNOWN)
+    }
+
+    object Category {
+        const val VEHICLE = "Vehicle"
+        const val GENERATOR = "Generator"
+        const val PUMP = "Pump"
+        const val OTHER = "Other"
+        val ALL = listOf(VEHICLE, GENERATOR, PUMP, OTHER)
+    }
+
     data class Machine(
         val id: String,
+        val engineType: String,
+        val category: String,
+        val notes: String,
         val createdAtUtc: String,
         /** [AnomalyScorer.toJson], or null if this machine has not been enrolled yet. */
         val scorerJson: String?,
@@ -45,45 +63,47 @@ class MachineRegistry(context: Context) {
 
     fun find(id: String): Machine? = all().firstOrNull { it.id.equals(id.trim(), ignoreCase = true) }
 
-    fun knownIds(): List<String> = all().map { it.id }.sortedBy { it.lowercase() }
+    fun idExists(id: String): Boolean = find(id) != null
 
-    /** Creates the machine if it does not exist yet; otherwise leaves it untouched. */
-    fun ensureExists(id: String, nowUtc: String) {
+    /** Creates a new machine with full attributes. Overwrites nothing if the id already exists. */
+    fun addMachine(id: String, engineType: String, category: String, notes: String, nowUtc: String): Boolean {
         val trimmed = id.trim()
-        if (trimmed.isEmpty() || find(trimmed) != null) return
-        val m = Machine(trimmed, nowUtc, null, 0, null, null, emptyMap())
-        write(all() + m)
+        if (trimmed.isEmpty() || idExists(trimmed)) return false
+        write(all() + Machine(trimmed, engineType, category, notes, nowUtc, null, 0, null, null, emptyMap()))
+        return true
+    }
+
+    fun updateAttributes(id: String, engineType: String, category: String, notes: String) {
+        val existing = find(id) ?: return
+        replace(id, existing.copy(engineType = engineType, category = category, notes = notes))
     }
 
     fun saveScorer(id: String, scorerJson: String) {
-        val trimmed = id.trim()
-        if (trimmed.isEmpty()) return
-        val existing = find(trimmed)
-        val merged = (existing ?: Machine(trimmed, nowIso(), null, 0, null, null, emptyMap()))
-            .copy(scorerJson = scorerJson)
-        replace(trimmed, merged)
+        val existing = find(id) ?: return
+        replace(id, existing.copy(scorerJson = scorerJson))
     }
 
     fun recordCheck(id: String, verdict: String, nowUtc: String) {
-        val trimmed = id.trim()
-        val existing = find(trimmed) ?: return
-        replace(trimmed, existing.copy(
+        val existing = find(id) ?: return
+        replace(id, existing.copy(
             checkCount = existing.checkCount + 1,
             lastVerdict = verdict,
             lastCheckedAtUtc = nowUtc,
         ))
     }
 
-    fun recordLabeledClip(id: String, corpusLabel: String, nowUtc: String) {
-        val trimmed = id.trim()
-        if (trimmed.isEmpty()) return
-        val existing = find(trimmed) ?: Machine(trimmed, nowUtc, null, 0, null, null, emptyMap())
+    fun recordLabeledClip(id: String, corpusLabel: String, count: Int = 1) {
+        val existing = find(id) ?: return
         val counts = existing.labeledCounts.toMutableMap()
-        counts[corpusLabel] = (counts[corpusLabel] ?: 0) + 1
-        replace(trimmed, existing.copy(labeledCounts = counts))
+        counts[corpusLabel] = (counts[corpusLabel] ?: 0) + count
+        replace(id, existing.copy(labeledCounts = counts))
     }
 
     fun totalLabeledClips(id: String): Int = find(id)?.labeledCounts?.values?.sum() ?: 0
+
+    fun delete(id: String) {
+        write(all().filterNot { it.id.equals(id, ignoreCase = true) })
+    }
 
     private fun replace(id: String, updated: Machine) {
         val others = all().filterNot { it.id.equals(id, ignoreCase = true) }
@@ -99,6 +119,9 @@ class MachineRegistry(context: Context) {
 
     private fun toJson(m: Machine) = JSONObject().apply {
         put("id", m.id)
+        put("engine_type", m.engineType)
+        put("category", m.category)
+        put("notes", m.notes)
         put("created_at_utc", m.createdAtUtc)
         put("scorer_json", m.scorerJson ?: JSONObject.NULL)
         put("check_count", m.checkCount)
@@ -113,6 +136,9 @@ class MachineRegistry(context: Context) {
         countsObj?.keys()?.forEach { k -> counts[k] = countsObj.optInt(k, 0) }
         return Machine(
             id = o.optString("id"),
+            engineType = o.optString("engine_type", EngineType.UNKNOWN),
+            category = o.optString("category", Category.OTHER),
+            notes = o.optString("notes", ""),
             createdAtUtc = o.optString("created_at_utc", ""),
             scorerJson = if (o.isNull("scorer_json")) null else o.optString("scorer_json"),
             checkCount = o.optInt("check_count", 0),

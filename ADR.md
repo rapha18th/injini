@@ -358,6 +358,55 @@ saved. The written WAV opens cleanly in Python's stdlib `wave` module (mono,
 16-bit, 16 kHz, exactly 10.0 s) and the manifest row carries the real device
 model, capture source (`UNPROCESSED`), and the machine id as source key.
 
+## ADR-15: ADR-14 was a redundant button, not a design. Corrected.
+
+**Context.** ADR-14 shipped a third button, "Add training clip", as a
+manually-triggered recording separate from Enrol and Check. Direct
+correction: every Enrol clip is already a healthy recording of a real
+machine, so writing it to the corpus is not an extra decision, it is what
+Enrol already means. Every Check clip is a real recording too; what it is
+missing is not a button; it is a verdict, which does not exist yet at record
+time and normally will not exist for hours or days, until a mechanic has
+actually opened the machine up. A button that asks "healthy or faulty?" at
+the moment of Check is asking a question nobody present can honestly answer.
+A further correction: any of this had to point at real supervised
+retraining, not just a habit of collecting files.
+
+**Decision.**
+
+- Enrol now writes every one of its clips straight into the training corpus
+  under the healthy label, no separate save step, no dialog. This removed
+  the third button entirely — `AddClipButton`, `FaultLabel`'s trigger from
+  `MainActivity`, and the "Add training clip" flow are gone from the main
+  screen. `LabeledClipStore.save()` is now called only from inside
+  `runEnrol()`'s loop.
+- Check now saves its clip too, but into a new pending queue
+  (`LabeledClipStore.savePending`/`pending.csv`), tagged only with the
+  on-device model's tier as a hint, never a final label. `MainActivity`'s
+  machine row grows a live "N awaiting a verdict" flag the moment a Check
+  produces one.
+- `MachineListActivity` (new) replaces the old one-line "type a name" dialog
+  entirely: a real fleet screen, "+ Add machine" opens a form collecting
+  engine type (Petrol/Diesel/Not sure) and machine category
+  (Vehicle/Generator/Pump/Other) alongside the name, because a rod knock on a
+  diesel generator and a rod knock on a petrol kombi are not the same
+  training example and a future model needs to know which is which. Tapping
+  a machine with pending recordings opens that machine's queue directly;
+  picking one clip opens the same label dialog from ADR-14, now firing
+  `LabeledClipStore.confirmPending()`, which moves the file from `_pending/`
+  into its final label folder and appends the confirmed manifest row.
+
+**Verified on-device**, Samsung SM-M075F, from a clean install: added a
+Diesel/Generator machine ("Genset_Clinic") through the new form, ran a full
+6-clip Enrol (all six landed in `manifest.csv` under `Normal` with
+`engine_type=Diesel, category=Generator`, no extra tap), ran a Check (landed
+in `pending.csv`, the model's tier as `provisional_tier`, machine row showed
+"1 awaiting a verdict" immediately), then labelled it from the machine list
+as "Alternator Bearing Noise" with a typed mechanic's verdict — confirmed the
+WAV physically moved out of `_pending/` into `Alternator Bearing Noise/`, the
+pending row was removed, and the confirmed manifest row carried the real
+verdict text and the machine's engine type and category.
+
 ## Results summary (for context; full table and narrative in Injini.docx §10)
 
 Five DCASE 2025 machine types (bearing, fan, gearbox, slider, valve), CPU,

@@ -68,11 +68,12 @@ cd android && ./gradlew assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-A named-machine fleet, not one hardcoded scorer: tap the machine row to select or add one (`MachineRegistry.kt`, one JSON file, same shape as TapSense's vessel registry). Three flows, all against whichever machine is selected:
+A named-machine fleet, not one hardcoded scorer: tap the machine row to open **Machines** (`MachineListActivity`), a real fleet screen — "+ Add machine" collects a name, engine type (Petrol/Diesel/Not sure) and category (Vehicle/Generator/Pump/Other), because a rod knock on a diesel generator and the same fault on a petrol kombi are not one training example. `MachineRegistry.kt` (one JSON file, same shape as TapSense's vessel registry) persists it.
 
-- **Enrol** records six healthy ten-second clips and stores that machine's own fingerprint.
-- **Check** records one clip and returns a three-tier verdict against it.
-- **Add training clip** records one clip and saves it labelled — healthy after a service, or faulty with a mechanic's verdict against the fault-ID head's own class list (`FaultLabel.kt`) — as a real WAV plus a manifest row shaped like `prepare_engine_sounds.py` already expects (`LabeledClipStore.kt`). This is the field data-collection tool the working paper's Section 09 once imagined as separate software, built into the same app instead.
+Two flows, both against whichever machine is selected, and both feed the training corpus with no extra button:
+
+- **Enrol** records six healthy ten-second clips, builds that machine's fingerprint, and writes every one of those clips straight into the corpus under the healthy label — a clip recorded during enrolment is healthy by definition, so there is nothing left to ask.
+- **Check** records one clip and returns a three-tier verdict, then queues that same clip with the model's tier as a hint, not a label. What Check cannot know is the real answer, which usually does not exist for hours or days, until a mechanic has actually looked. The machine row grows a live "N awaiting a verdict" flag; opening the machine list from there lists each queued recording, and picking one opens the label dialog — healthy confirmed, or faulty against the fault-ID head's own class list (`FaultLabel.kt`), free text for a fault the taxonomy has no name for yet. Confirming moves the file out of the pending queue into its real corpus folder (`LabeledClipStore.kt`) with a manifest row shaped like `prepare_engine_sounds.py` already expects. This is the field data-collection tool the working paper's Section 09 once imagined as separate software, built into the same two flows instead of a third one.
 
 Every recording drives a live waveform and a counting-down status line (`WaveformView.kt`) instead of a frozen screen for the full ten seconds. The "Full model results" dialog shows the matched FP32-vs-INT8 embedder benchmark and the execution-provider trace, same methodology as SiloSense. Custom adaptive icon: a five-bar amber waveform on the app's own instrument-panel dark ground, not a placeholder.
 

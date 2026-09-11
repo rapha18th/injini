@@ -2,16 +2,10 @@ package com.injini.app
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.view.LayoutInflater
 import android.view.View
-import android.widget.ArrayAdapter
-import android.widget.EditText
-import android.widget.LinearLayout
-import android.widget.RadioButton
-import android.widget.RadioGroup
-import android.widget.Spinner
 import android.widget.Button
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
@@ -23,20 +17,22 @@ import androidx.core.view.WindowInsetsCompat
 import kotlin.concurrent.thread
 
 /**
- * Three flows, all against whichever machine is currently selected (see
- * [MachineRegistry], [machineRow]):
+ * Two flows against whichever machine is currently selected (see
+ * [MachineRegistry] and [MachineListActivity]):
  *
- *   Enrol   record [ENROL_CLIPS] healthy clips, embed them, build an
- *           [AnomalyScorer], persist it under this machine's id.
- *   Check   record one clip, score it against the machine's healthy
- *           fingerprint, show a three-tier verdict.
- *   Add training clip   record one clip and save it, labelled, for the next
- *           supervised fault-classification retrain — see [LabeledClipStore]
- *           and [FaultLabel]. This is the "collect real data" half of the
- *           product, not a separate app the way the working paper once
- *           imagined it.
+ *   Enrol   record [ENROL_CLIPS] healthy clips, embed them to build this
+ *           machine's [AnomalyScorer], AND save every one of them straight
+ *           into the training corpus under the healthy label — an enrolled
+ *           clip is healthy by construction, so there is nothing left to ask
+ *           the user about it. See [LabeledClipStore.save].
+ *   Check   record one clip, score it against the machine's fingerprint,
+ *           show a three-tier verdict, and save the clip with that
+ *           provisional tier as a hint. What Check does NOT know is the real
+ *           answer — that comes from a mechanic, later — so the clip queues
+ *           in [LabeledClipStore.savePending] until someone visits the
+ *           machine list and says what actually turned out to be true.
  *
- * Every recording, of any kind, runs through [recordWithFeedback], which
+ * Every recording, of either kind, runs through [recordWithFeedback], which
  * drives a live [WaveformView] and a counting-down status line so a
  * ten-second clip never looks like a stuck screen.
  */
@@ -53,6 +49,11 @@ class MainActivity : AppCompatActivity() {
         if (ok) setIdle() else status("MIC DENIED", "Injini needs the microphone to listen to the machine.")
     }
 
+    private val pickMachine = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val id = result.data?.getStringExtra(MachineListActivity.EXTRA_SELECTED_ID)
+        if (result.resultCode == RESULT_OK && id != null) selectMachine(id)
+    }
+
     private lateinit var machineRow: TextView
     private lateinit var statusWord: TextView
     private lateinit var detailText: TextView
@@ -60,7 +61,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var waveform: WaveformView
     private lateinit var checkButton: Button
     private lateinit var enrolButton: Button
-    private lateinit var addClipButton: Button
     private lateinit var resultsLink: TextView
 
     private lateinit var features: AudioFeatures
@@ -89,7 +89,6 @@ class MainActivity : AppCompatActivity() {
         waveform = findViewById(R.id.waveform)
         checkButton = findViewById(R.id.checkButton)
         enrolButton = findViewById(R.id.enrolButton)
-        addClipButton = findViewById(R.id.addClipButton)
         resultsLink = findViewById(R.id.resultsLink)
 
         features = AudioFeatures(this)
@@ -102,11 +101,16 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread { embedder = e; restoreLastMachine(); setIdle() }
         }
 
-        machineRow.setOnClickListener { showMachinePicker() }
+        machineRow.setOnClickListener { openMachineList() }
         checkButton.setOnClickListener { ensureMic { withMachine { runCheck() } } }
         enrolButton.setOnClickListener { ensureMic { withMachine { runEnrol() } } }
-        addClipButton.setOnClickListener { ensureMic { withMachine { showLabelDialog() } } }
         resultsLink.setOnClickListener { showResults() }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Attributes or pending counts may have changed in the machine list.
+        machineId?.let { refreshMachineRow(it) }
     }
 
     /**
@@ -135,9 +139,9 @@ class MainActivity : AppCompatActivity() {
             == PackageManager.PERMISSION_GRANTED) then() else askMic.launch(Manifest.permission.RECORD_AUDIO)
     }
 
-    /** Runs [then] if a machine is already selected, otherwise opens the picker first. */
+    /** Runs [then] if a machine is already selected, otherwise opens the fleet screen first. */
     private fun withMachine(then: () -> Unit) {
-        if (machineId != null) then() else showMachinePicker(onSelected = then)
+        if (machineId != null) then() else openMachineList()
     }
 
     // ---------------------------------------------------------------- machines
@@ -149,53 +153,19 @@ class MainActivity : AppCompatActivity() {
 
     private fun selectMachine(id: String) {
         machineId = id
-        val m = registry.find(id)
-        scorer = m?.scorerJson?.let { runCatching { AnomalyScorer.fromJson(it) }.getOrNull() }
-        machineRow.text = "Machine: $id  ›"
+        scorer = registry.find(id)?.scorerJson?.let { runCatching { AnomalyScorer.fromJson(it) }.getOrNull() }
+        refreshMachineRow(id)
         getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_LAST_MACHINE, id).apply()
         setIdle()
     }
 
-    /** Lists every known machine plus a field to name a new one. [onSelected] fires after a pick, if given. */
-    private fun showMachinePicker(onSelected: (() -> Unit)? = null) {
-        val view = LayoutInflater.from(this).inflate(R.layout.dialog_machine_picker, null)
-        val nameInput = view.findViewById<EditText>(R.id.machineNameInput)
-        val existingList = view.findViewById<LinearLayout>(R.id.existingList)
-        val existingLabel = view.findViewById<TextView>(R.id.existingLabel)
-        nameInput.setText(machineId ?: "")
-
-        val known = registry.knownIds()
-        existingLabel.visibility = if (known.isEmpty()) View.GONE else View.VISIBLE
-        var dialog: AlertDialog? = null
-        for (id in known) {
-            val row = TextView(this).apply {
-                text = "  $id"
-                textSize = 15f
-                setPadding(4, 20, 4, 20)
-                setOnClickListener {
-                    nameInput.setText(id)
-                    confirmMachine(id, onSelected)
-                    dialog?.dismiss()
-                }
-            }
-            existingList.addView(row)
-        }
-
-        dialog = AlertDialog.Builder(this)
-            .setTitle("Choose a machine")
-            .setView(view)
-            .setPositiveButton("Use this name") { _, _ ->
-                val id = nameInput.text.toString().trim()
-                if (id.isNotEmpty()) confirmMachine(id, onSelected)
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
+    private fun refreshMachineRow(id: String) {
+        val pending = clipStore.pendingCount(id)
+        machineRow.text = if (pending > 0) "Machine: $id  ·  $pending awaiting a verdict  ›" else "Machine: $id  ›"
     }
 
-    private fun confirmMachine(id: String, onSelected: (() -> Unit)?) {
-        registry.ensureExists(id, MachineRegistry.nowIso())
-        selectMachine(id)
-        onSelected?.invoke()
+    private fun openMachineList() {
+        pickMachine.launch(Intent(this, MachineListActivity::class.java))
     }
 
     // ------------------------------------------------------------ recording UX
@@ -232,19 +202,17 @@ class MainActivity : AppCompatActivity() {
         val hasMachine = machineId != null
         checkButton.isEnabled = embedder != null && hasMachine && scorer != null
         enrolButton.isEnabled = embedder != null
-        addClipButton.isEnabled = embedder != null
         checkButton.alpha = if (checkButton.isEnabled) 1f else 0.4f
         enrolButton.alpha = if (enrolButton.isEnabled) 1f else 0.4f
-        addClipButton.alpha = if (addClipButton.isEnabled) 1f else 0.4f
     }
 
     private fun setIdle() {
         refreshButtons()
         when {
             machineId == null ->
-                status("PICK A MACHINE", "Tap the machine row above to select or add one, then Enrol or add a training clip.")
+                status("PICK A MACHINE", "Tap the machine row above to add one or choose from your fleet.")
             scorer == null ->
-                status("NOT ENROLLED", "Enrol $machineId first: $ENROL_CLIPS ten-second clips while it runs normally.")
+                status("NOT ENROLLED", "Enrol $machineId first: $ENROL_CLIPS ten-second clips while it runs normally. Every clip also joins the training corpus as healthy.")
             else ->
                 status("READY", "Enrolled: $machineId. Hold the phone near it and Check.")
         }
@@ -255,9 +223,10 @@ class MainActivity : AppCompatActivity() {
     private fun runEnrol() {
         val e = embedder ?: return
         val id = machineId ?: return
+        val m = registry.find(id) ?: return
         if (busy) return
         busy = true
-        checkButton.isEnabled = false; enrolButton.isEnabled = false; addClipButton.isEnabled = false
+        checkButton.isEnabled = false; enrolButton.isEnabled = false
         thread {
             val healthy = ArrayList<FloatArray>(ENROL_CLIPS)
             try {
@@ -268,6 +237,15 @@ class MainActivity : AppCompatActivity() {
                     )
                     val mel = features.logMelFromPcm(rec.pcm, rec.sampleRate)
                     healthy += e.embed(mel)
+                    // Healthy by construction: every enrol clip joins the training
+                    // corpus immediately, no extra button and no extra decision.
+                    clipStore.save(
+                        pcm = rec.pcm, sampleRate = rec.sampleRate, machineId = id,
+                        engineType = m.engineType, category = m.category,
+                        corpusLabel = FaultLabel.HEALTHY_CORPUS_KEY, displayLabel = "Healthy (enrolment)",
+                        mechanicVerdict = "", captureSource = rec.source,
+                    )
+                    registry.recordLabeledClip(id, FaultLabel.HEALTHY_CORPUS_KEY)
                 }
                 val s = AnomalyScorer.enroll(healthy)
                 registry.saveScorer(id, s.toJson())
@@ -284,9 +262,10 @@ class MainActivity : AppCompatActivity() {
         val e = embedder ?: return
         val s = scorer ?: return
         val id = machineId ?: return
+        val m = registry.find(id) ?: return
         if (busy) return
         busy = true
-        checkButton.isEnabled = false; enrolButton.isEnabled = false; addClipButton.isEnabled = false
+        checkButton.isEnabled = false; enrolButton.isEnabled = false
         thread {
             try {
                 val rec = recordWithFeedback(
@@ -297,6 +276,14 @@ class MainActivity : AppCompatActivity() {
                 val (emb, ms) = e.timedEmbed(mel)
                 val r = s.score(emb)
                 registry.recordCheck(id, r.tier.name, MachineRegistry.nowIso())
+                // What Check knows right now is a model guess, not a verdict. The
+                // clip is saved and queued; the real label — healthy confirmed, or
+                // a mechanic's actual finding — comes later from the machine list.
+                clipStore.savePending(
+                    pcm = rec.pcm, sampleRate = rec.sampleRate, machineId = id,
+                    engineType = m.engineType, category = m.category,
+                    provisionalTier = r.tier.name, captureSource = rec.source,
+                )
                 runOnUiThread {
                     latencyChip.text = "embed ${"%.1f".format(ms)} ms"
                     val (word, line) = when (r.tier) {
@@ -311,76 +298,13 @@ class MainActivity : AppCompatActivity() {
                         "\n\nCapture source: ${rec.source} (unprocessed audio unavailable on this device; the reading is less reliable)."
                     else ""
                     status(word, "$line\n\nscore ${"%.3f".format(r.score)}  " +
-                        "(kNN ${"%.3f".format(r.knnDistance)}, Mahalanobis ${"%.3f".format(r.mahalanobis)})$src")
+                        "(kNN ${"%.3f".format(r.knnDistance)}, Mahalanobis ${"%.3f".format(r.mahalanobis)})$src\n\n" +
+                        "Saved. When you know what this really was, open the machine list to label it.")
+                    refreshMachineRow(id)
                     refreshButtons()
                 }
             } catch (ex: Exception) {
                 runOnUiThread { status("CHECK FAILED", ex.message ?: "unknown error"); setIdle() }
-            }
-        }
-    }
-
-    // ---------------------------------------------------------- training clips
-
-    /** Healthy-after-service or faulty-with-a-mechanic's-verdict, for the fault-ID retrain. */
-    private fun showLabelDialog() {
-        val id = machineId ?: return
-        val view = LayoutInflater.from(this).inflate(R.layout.dialog_label_clip, null)
-        val group = view.findViewById<RadioGroup>(R.id.labelKindGroup)
-        val radioFaulty = view.findViewById<RadioButton>(R.id.radioFaulty)
-        val spinner = view.findViewById<Spinner>(R.id.faultSpinner)
-        val verdictInput = view.findViewById<EditText>(R.id.verdictInput)
-
-        spinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, FaultLabel.faultyDisplayOptions())
-        group.setOnCheckedChangeListener { _, _ ->
-            val faulty = radioFaulty.isChecked
-            spinner.visibility = if (faulty) View.VISIBLE else View.GONE
-            verdictInput.visibility = if (faulty) View.VISIBLE else View.GONE
-        }
-
-        AlertDialog.Builder(this)
-            .setTitle("Add a training clip for $id")
-            .setView(view)
-            .setPositiveButton("Record 10 s") { _, _ ->
-                val faulty = radioFaulty.isChecked
-                val display = if (faulty) spinner.selectedItem as? String ?: FaultLabel.OTHER_DISPLAY else FaultLabel.HEALTHY_DISPLAY
-                val verdict = if (faulty) verdictInput.text.toString() else ""
-                runAddTrainingClip(id, display, verdict, healthy = !faulty)
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
-    }
-
-    private fun runAddTrainingClip(id: String, displayLabel: String, mechanicVerdict: String, healthy: Boolean) {
-        val e = embedder ?: return
-        if (busy) return
-        busy = true
-        checkButton.isEnabled = false; enrolButton.isEnabled = false; addClipButton.isEnabled = false
-        thread {
-            try {
-                val corpusLabel = if (healthy) FaultLabel.HEALTHY_CORPUS_KEY
-                    else FaultLabel.corpusKeyFor(displayLabel, mechanicVerdict)
-                val what = if (healthy) "healthy sound" else "the fault: $displayLabel"
-                val rec = recordWithFeedback(
-                    CLIP_SECONDS, "COLLECTING TRAINING CLIP",
-                    "Recording $what from $id for the next retrain.",
-                )
-                clipStore.save(
-                    pcm = rec.pcm, sampleRate = rec.sampleRate, machineId = id,
-                    corpusLabel = corpusLabel, displayLabel = displayLabel,
-                    mechanicVerdict = mechanicVerdict, captureSource = rec.source,
-                )
-                registry.recordLabeledClip(id, corpusLabel, MachineRegistry.nowIso())
-                val total = clipStore.clipCount()
-                val forMachine = registry.totalLabeledClips(id)
-                runOnUiThread {
-                    status("CLIP SAVED", "Labelled \"$corpusLabel\" for $id.\n\n" +
-                        "$forMachine training ${if (forMachine == 1) "clip" else "clips"} collected for this machine, " +
-                        "$total total on this phone.")
-                    refreshButtons()
-                }
-            } catch (ex: Exception) {
-                runOnUiThread { status("SAVE FAILED", ex.message ?: "unknown error"); setIdle() }
             }
         }
     }
@@ -408,7 +332,9 @@ class MainActivity : AppCompatActivity() {
                 appendLine("Process memory (PSS): ${DeviceDiagnostics.pssKb()} KB")
                 appendLine("Thermal status: ${DeviceDiagnostics.thermalStatus(this@MainActivity)}")
                 appendLine()
-                appendLine("Training clips collected on this phone: ${clipStore.clipCount()}")
+                appendLine("Machines on this phone: ${registry.all().size}")
+                appendLine("Training clips collected: ${clipStore.clipCount()}")
+                appendLine("Recordings awaiting a verdict: ${clipStore.pendingCount()}")
             }
             runOnUiThread {
                 AlertDialog.Builder(this).setTitle("Full model results").setMessage(text)

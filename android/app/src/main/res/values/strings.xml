@@ -4,6 +4,5 @@
     <string name="tagline">Hear a failing engine</string>
     <string name="check">Check</string>
     <string name="enrol">Enrol machine</string>
-    <string name="add_training_clip">Add training clip</string>
     <string name="full_results">Full model results</string>
 </resources>

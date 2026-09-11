@@ -147,21 +147,6 @@
         android:textSize="14sp"
         android:letterSpacing="0.06"
         android:stateListAnimator="@null"
-        app:layout_constraintBottom_toTopOf="@id/addClipButton"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginBottom="10dp" />
-
-    <androidx.appcompat.widget.AppCompatButton
-        android:id="@+id/addClipButton"
-        android:layout_width="0dp"
-        android:layout_height="52dp"
-        android:background="@drawable/bg_button"
-        android:text="@string/add_training_clip"
-        android:textColor="@color/injini_green"
-        android:textSize="14sp"
-        android:letterSpacing="0.06"
-        android:stateListAnimator="@null"
         app:layout_constraintBottom_toTopOf="@id/resultsLink"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
