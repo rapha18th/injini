@@ -228,6 +228,41 @@ completely plausible (0.427 macro F1 across 25 classes reads fine at a glance)
 while actually measuring how easily an AudioSet embedder tells birdsong from
 piston slap, not fault identification.
 
+## ADR-11: A plain `<Button>` under Material Components ignores `android:background`
+
+**Context.** First on-device build (2026-09-11, Samsung SM-M075F), first real
+screenshot. The Check button rendered as designed (flat dark surface, amber
+stroke and text), but the Enrol button came back a solid Material-filled
+amber block with white text — visually inconsistent with every other surface
+in the app.
+
+**Root cause.** The Material Components theme (`Theme.MaterialComponents.*`,
+required for `androidx.appcompat`'s theming) auto-promotes a plain XML
+`<Button>` tag to `com.google.android.material.button.MaterialButton` at
+inflation time. `MaterialButton`'s default style paints its own
+`MaterialShapeDrawable` background tinted by `colorPrimary` and ignores a
+plain `android:background="@drawable/..."` attribute entirely. The Check
+button happened to look closer to intended only because it started disabled
+(not yet enrolled), and Material's disabled-state tinting muted the fill
+enough to look coincidentally close to the flat design.
+
+**Fix.** Both buttons declared explicitly as
+`androidx.appcompat.widget.AppCompatButton` in the layout XML instead of the
+bare `<Button>` tag, which is not auto-promoted and honours `android:background`
+as written. Kotlin code needed no change: `AppCompatButton extends Button`, so
+the existing `lateinit var checkButton: Button` field type still resolves via
+`findViewById`. Also added an explicit disabled-state alpha (1.0 / 0.4) in
+`MainActivity.setIdle()`, since the flat background drawable carries no
+built-in disabled visual on its own.
+
+**Lesson.** Under a Material Components theme, `<Button>` is not "just a
+button" — it is silently a MaterialButton with its own opinionated background
+handling. Any custom flat/outlined button style needs either
+`AppCompatButton` explicitly, or a `style=` attribute pointing at one of
+Material's own outlined/text button styles configured with the right
+attributes (`app:strokeColor`, `app:backgroundTint`, etc.) — a plain
+`android:background` on `<Button>` is silently a no-op.
+
 ## Results summary (for context; full table and narrative in Injini.docx §10)
 
 Five DCASE 2025 machine types (bearing, fan, gearbox, slider, valve), CPU,

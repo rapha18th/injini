@@ -99,6 +99,8 @@ class MainActivity : AppCompatActivity() {
         busy = false
         checkButton.isEnabled = embedder != null && scorer != null
         enrolButton.isEnabled = embedder != null
+        checkButton.alpha = if (checkButton.isEnabled) 1f else 0.4f
+        enrolButton.alpha = if (enrolButton.isEnabled) 1f else 0.4f
         if (scorer == null) {
             status("NOT ENROLLED", "Enrol this machine first: $ENROL_CLIPS ten-second clips while it runs normally.")
         } else {

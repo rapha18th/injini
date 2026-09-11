@@ -1,16 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Placeholder mark: a simple sound-wave-ish glyph. Swap via Android
-     Studio's Image Asset wizard (right-click res/ -> New -> Image Asset)
-     whenever there's time for real branding — not a priority for a demo. -->
+<!--
+  Five-bar waveform, sharp-edged like an instrument-panel level meter, amber
+  on the app's own dark ground. Reads as "listening" at any size and matches
+  the in-app amber reading colour (see colors.xml, injini_amber). Confined to
+  the adaptive-icon safe zone: a 66dp circle centered on this 108dp canvas.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
     <path
-        android:fillColor="#EEF4EE"
-        android:pathData="M34,44 L34,64 M44,34 L44,74 M54,24 L54,84 M64,34 L64,74 M74,44 L74,64"
-        android:strokeColor="#EEF4EE"
-        android:strokeWidth="8"
-        android:strokeLineCap="round" />
+        android:fillColor="#E0A64B"
+        android:pathData="
+            M26.5,42 L33.5,42 L33.5,66 L26.5,66 Z
+            M38.5,36 L45.5,36 L45.5,72 L38.5,72 Z
+            M50.5,30 L57.5,30 L57.5,78 L50.5,78 Z
+            M62.5,36 L69.5,36 L69.5,72 L62.5,72 Z
+            M74.5,42 L81.5,42 L81.5,66 L74.5,66 Z" />
 </vector>

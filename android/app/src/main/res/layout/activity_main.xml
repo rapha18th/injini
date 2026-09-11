@@ -72,7 +72,14 @@
         app:layout_constraintTop_toBottomOf="@id/detailText"
         app:layout_constraintStart_toStartOf="parent" />
 
-    <Button
+    <!--
+      Plain AppCompatButton, not <Button> — the Material Components theme
+      auto-promotes a bare <Button> to MaterialButton, which paints its own
+      colorPrimary-filled background and ignores android:background entirely.
+      That silently turned the Enrol button into a solid amber Material
+      button instead of the flat dark-with-stroke style used everywhere else.
+    -->
+    <androidx.appcompat.widget.AppCompatButton
         android:id="@+id/checkButton"
         android:layout_width="0dp"
         android:layout_height="58dp"
@@ -88,7 +95,7 @@
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginBottom="12dp" />
 
-    <Button
+    <androidx.appcompat.widget.AppCompatButton
         android:id="@+id/enrolButton"
         android:layout_width="0dp"
         android:layout_height="52dp"
