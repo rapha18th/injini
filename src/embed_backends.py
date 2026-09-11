@@ -21,9 +21,16 @@ sys.path.insert(0, _HERE)
 import features as F  # noqa: E402
 
 
-def _batched_logmels(waves: list[np.ndarray]) -> np.ndarray:
+def _mel_batch(waves: list[np.ndarray]) -> np.ndarray:
     mels = [F.logmel(w, fixed=True) for w in waves]
-    return np.stack(mels, axis=0)[:, None, :, :].astype(np.float32)  # (N,1,128,T)
+    return np.stack(mels, axis=0)[:, None, :, :].astype(np.float32)  # (n,1,128,T)
+
+
+# Chunk size for large corpora (e.g. the ~20k-clip engine-sounds manifest):
+# materialising every clip's log-mel before batching for inference held
+# ~9 GB per 17k-clip split and was OOM-killed with no traceback on Kaggle's
+# CPU tier. Embedding is now genuinely streamed, one chunk of mels at a time.
+CHUNK = 512
 
 
 class TorchBackend:
@@ -35,12 +42,13 @@ class TorchBackend:
         self.model = Embedder(name)
 
     def embed(self, waves: list[np.ndarray], batch: int = 16) -> np.ndarray:
-        x = _batched_logmels(waves)
         out = []
-        for i in range(0, len(x), batch):
-            t = self.torch.from_numpy(x[i:i + batch])
-            with self.torch.no_grad():
-                out.append(self.model(t).cpu().numpy())
+        for c in range(0, len(waves), CHUNK):
+            x = _mel_batch(waves[c:c + CHUNK])
+            for i in range(0, len(x), batch):
+                t = self.torch.from_numpy(x[i:i + batch])
+                with self.torch.no_grad():
+                    out.append(self.model(t).cpu().numpy())
         return np.concatenate(out, axis=0).astype(np.float32)
 
 
@@ -53,10 +61,11 @@ class OnnxBackend:
         self.iname = self.sess.get_inputs()[0].name
 
     def embed(self, waves: list[np.ndarray], batch: int = 16) -> np.ndarray:
-        x = _batched_logmels(waves)
         out = []
-        for i in range(0, len(x), batch):
-            out.append(self.sess.run(None, {self.iname: x[i:i + batch]})[0])
+        for c in range(0, len(waves), CHUNK):
+            x = _mel_batch(waves[c:c + CHUNK])
+            for i in range(0, len(x), batch):
+                out.append(self.sess.run(None, {self.iname: x[i:i + batch]})[0])
         e = np.concatenate(out, axis=0).astype(np.float32)
         return e / (np.linalg.norm(e, axis=1, keepdims=True) + 1e-12)
 

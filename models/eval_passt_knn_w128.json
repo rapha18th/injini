@@ -1,0 +1,47 @@
+{
+  "backend": "passt",
+  "scorer": "knn",
+  "whiten": 128,
+  "source": "hf",
+  "official_score": 0.5962834219746291,
+  "mean_auc": 0.6374000000000001,
+  "mean_pauc": 0.5705263157894735,
+  "per_machine": {
+    "bearing": {
+      "auc_source": 0.464,
+      "auc_target": 0.5656,
+      "pauc": 0.48736842105263156,
+      "n_train": 1000,
+      "n_test": 200
+    },
+    "fan": {
+      "auc_source": 0.592,
+      "auc_target": 0.568,
+      "pauc": 0.5210526315789473,
+      "n_train": 1000,
+      "n_test": 200
+    },
+    "gearbox": {
+      "auc_source": 0.5208,
+      "auc_target": 0.6060000000000001,
+      "pauc": 0.5747368421052632,
+      "n_train": 1000,
+      "n_test": 200
+    },
+    "slider": {
+      "auc_source": 0.7836,
+      "auc_target": 0.6868000000000001,
+      "pauc": 0.5457894736842105,
+      "n_train": 1000,
+      "n_test": 200
+    },
+    "valve": {
+      "auc_source": 0.8868,
+      "auc_target": 0.7004,
+      "pauc": 0.7236842105263157,
+      "n_train": 1000,
+      "n_test": 200
+    }
+  },
+  "seconds": 18680.3
+}

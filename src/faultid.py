@@ -34,9 +34,11 @@ def embed_split(backend, rows, split, cap=None):
     sel = [r for r in rows if r["split"] == split]
     if cap:
         sel = sel[:cap]
+    print(f"  embedding {split}: {len(sel)} clips", flush=True)
     waves = [F.load_audio(r["path"]) for r in sel]
     emb = backend.embed(waves)
     y = np.array([int(r["label"]) for r in sel])
+    print(f"  embedded {split}: {emb.shape}", flush=True)
     return emb, y
 
 
@@ -87,4 +89,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
