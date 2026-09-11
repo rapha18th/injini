@@ -1,0 +1,35 @@
+{
+  "system": "dcase_ae_baseline_mse",
+  "epochs": 100,
+  "source": "hf",
+  "official_score": 0.5471670413640833,
+  "mean_auc": 0.5599200000000001,
+  "mean_pauc": 0.534,
+  "per_machine": {
+    "bearing": {
+      "auc_source": 0.6136,
+      "auc_target": 0.5728,
+      "pauc": 0.6068421052631578
+    },
+    "fan": {
+      "auc_source": 0.5384,
+      "auc_target": 0.5612,
+      "pauc": 0.49157894736842106
+    },
+    "gearbox": {
+      "auc_source": 0.6168,
+      "auc_target": 0.5836,
+      "pauc": 0.5405263157894737
+    },
+    "slider": {
+      "auc_source": 0.5940000000000001,
+      "auc_target": 0.5336,
+      "pauc": 0.5273684210526316
+    },
+    "valve": {
+      "auc_source": 0.4484,
+      "auc_target": 0.5368,
+      "pauc": 0.5036842105263157
+    }
+  }
+}

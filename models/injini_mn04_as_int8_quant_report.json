@@ -1,0 +1,10 @@
+{
+  "fp32_onnx": "models/injini_mn04_as_fp32.onnx",
+  "int8_onnx": "models/injini_mn04_as_int8.onnx",
+  "fp32_mb": 2.138,
+  "int8_mb": 0.934,
+  "size_ratio": 2.29,
+  "approx_macs": 247808,
+  "n_calibration": 256,
+  "quant": "static QDQ INT8, per-channel weights, MinMax"
+}

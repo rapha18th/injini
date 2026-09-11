@@ -1,0 +1,47 @@
+{
+  "backend": "onnx:models/injini_mn10_as_fp32.onnx",
+  "scorer": "knn",
+  "whiten": 128,
+  "source": "hf",
+  "official_score": 0.6127044714075796,
+  "mean_auc": 0.65524,
+  "mean_pauc": 0.5570526315789474,
+  "per_machine": {
+    "bearing": {
+      "auc_source": 0.6172,
+      "auc_target": 0.6320000000000001,
+      "pauc": 0.5557894736842105,
+      "n_train": 1000,
+      "n_test": 200
+    },
+    "fan": {
+      "auc_source": 0.6028,
+      "auc_target": 0.5456,
+      "pauc": 0.5284210526315789,
+      "n_train": 1000,
+      "n_test": 200
+    },
+    "gearbox": {
+      "auc_source": 0.5892000000000001,
+      "auc_target": 0.5783999999999999,
+      "pauc": 0.5526315789473684,
+      "n_train": 1000,
+      "n_test": 200
+    },
+    "slider": {
+      "auc_source": 0.8068000000000001,
+      "auc_target": 0.6868,
+      "pauc": 0.5594736842105263,
+      "n_train": 1000,
+      "n_test": 200
+    },
+    "valve": {
+      "auc_source": 0.762,
+      "auc_target": 0.7316000000000001,
+      "pauc": 0.5889473684210527,
+      "n_train": 1000,
+      "n_test": 200
+    }
+  },
+  "seconds": 291.0
+}
