@@ -2,6 +2,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Only needed pre-Android 10: from Q on, exporting the dataset writes
+         through MediaStore instead, which needs no storage permission. -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
+    <!-- First network permission in this app. Used only for the explicit,
+         user-triggered "Sync to Hugging Face" upload in HfSync.kt — never
+         automatic, never in the background. Everything else stays offline. -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:allowBackup="true"
@@ -23,6 +30,23 @@
             android:name=".MachineListActivity"
             android:exported="false"
             android:label="Machines" />
+
+        <activity
+            android:name=".HfSyncActivity"
+            android:exported="false"
+            android:label="Sync to Hugging Face" />
+
+        <!-- Only exercised pre-Android 10, for sharing the exported dataset
+             zip from its legacy public-Downloads path — see DatasetExporter. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>

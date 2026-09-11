@@ -11,6 +11,7 @@ import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.AppCompatImageButton
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -56,8 +57,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private lateinit var machinePicker: TextView
-    private lateinit var machinesButton: Button
+    private lateinit var machinesButton: AppCompatImageButton
     private lateinit var machineInfo: TextView
+    private lateinit var reenrollBanner: TextView
     private lateinit var addVerdictButton: Button
     private lateinit var statusWord: TextView
     private lateinit var detailText: TextView
@@ -90,6 +92,7 @@ class MainActivity : AppCompatActivity() {
         machinePicker = findViewById(R.id.machinePicker)
         machinesButton = findViewById(R.id.machinesButton)
         machineInfo = findViewById(R.id.machineInfo)
+        reenrollBanner = findViewById(R.id.reenrollBanner)
         addVerdictButton = findViewById(R.id.addVerdictButton)
         statusWord = findViewById(R.id.statusWord)
         detailText = findViewById(R.id.detailText)
@@ -170,7 +173,7 @@ class MainActivity : AppCompatActivity() {
         setIdle()
     }
 
-    /** Updates the picker label, the inline attributes/progress card, and the Add verdict button — all from the registry, every time something might have changed. */
+    /** Updates the picker label, the inline attributes/progress card, the re-enrollment flag, and the Add verdict button — all from the registry, every time something might have changed. */
     private fun refreshMachineInfo(id: String) {
         val m = registry.find(id) ?: return
         machinePicker.text = "Machine: $id  ⌄"
@@ -181,10 +184,12 @@ class MainActivity : AppCompatActivity() {
         machineInfo.text = "${m.engineType} · ${m.category}\n" +
             "${if (enrolled) "Enrolled" else "Not enrolled"}  ·  ${m.checkCount} checks  ·  $total training clips"
 
+        reenrollBanner.visibility = if (m.needsReenrollment) View.VISIBLE else View.GONE
+
         val pending = clipStore.pendingCount(id)
         if (pending > 0) {
             addVerdictButton.visibility = View.VISIBLE
-            addVerdictButton.text = "⚠  $pending recording${if (pending == 1) "" else "s"} — Add verdict"
+            addVerdictButton.text = "$pending recording${if (pending == 1) "" else "s"} — Add verdict"
         } else {
             addVerdictButton.visibility = View.GONE
         }
@@ -250,6 +255,7 @@ class MainActivity : AppCompatActivity() {
         when {
             machineId == null -> {
                 machineInfo.visibility = View.GONE
+                reenrollBanner.visibility = View.GONE
                 addVerdictButton.visibility = View.GONE
                 status("PICK A MACHINE", "Tap the machine row above to select or add one.")
             }
@@ -377,6 +383,11 @@ class MainActivity : AppCompatActivity() {
                 appendLine("Machines on this phone: ${registry.all().size}")
                 appendLine("Training clips collected: ${clipStore.clipCount()}")
                 appendLine("Recordings awaiting a verdict: ${clipStore.pendingCount()}")
+                appendLine()
+                appendLine("Field benchmark (on-device tier vs. mechanic verdict):")
+                appendLine("  False positives (flagged, turned out healthy): ${registry.totalFalsePositives()}")
+                appendLine("  Missed faults (read healthy, turned out faulty): ${registry.totalFalseNegatives()}")
+                appendLine("  Machines needing re-enrollment: ${registry.countNeedingReenrollment()}")
             }
             runOnUiThread {
                 AlertDialog.Builder(this).setTitle("Full model results").setMessage(text)

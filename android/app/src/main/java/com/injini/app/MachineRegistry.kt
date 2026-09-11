@@ -47,6 +47,17 @@ class MachineRegistry(context: Context) {
         val lastCheckedAtUtc: String?,
         /** corpus label -> number of training clips collected for this machine under it. */
         val labeledCounts: Map<String, Int>,
+        /**
+         * True once a live Check that read HEALTHY has been given a mechanic
+         * verdict of Faulty — the enrolled fingerprint let a real fault
+         * through, so it may include a bad sample and should be rebuilt.
+         * Cleared automatically the next time this machine is enrolled.
+         */
+        val needsReenrollment: Boolean = false,
+        /** Check said "worth a look" or worse, mechanic said healthy — a field benchmark signal, not just a data label. */
+        val falsePositiveCount: Int = 0,
+        /** Check read HEALTHY, mechanic found a real fault — the more consequential miss. */
+        val falseNegativeCount: Int = 0,
     )
 
     private val file = File(context.getExternalFilesDir(null), "InjiniData/machines.json")
@@ -80,9 +91,24 @@ class MachineRegistry(context: Context) {
         replace(id, existing.copy(engineType = engineType, category = category, notes = notes))
     }
 
+    /** A fresh enrolment rebuilds the fingerprint from scratch, so any earlier re-enrollment flag no longer applies. */
     fun saveScorer(id: String, scorerJson: String) {
         val existing = find(id) ?: return
-        replace(id, existing.copy(scorerJson = scorerJson))
+        replace(id, existing.copy(scorerJson = scorerJson, needsReenrollment = false))
+    }
+
+    fun flagReenrollment(id: String) {
+        val existing = find(id) ?: return
+        replace(id, existing.copy(needsReenrollment = true))
+    }
+
+    /** Records how a Check's on-device tier compared to the mechanic's eventual verdict, per [LabeledClipStore]'s outcome. */
+    fun recordBenchmarkOutcome(id: String, outcome: String) {
+        val existing = find(id) ?: return
+        when (outcome) {
+            "false_positive" -> replace(id, existing.copy(falsePositiveCount = existing.falsePositiveCount + 1))
+            "false_negative" -> replace(id, existing.copy(falseNegativeCount = existing.falseNegativeCount + 1))
+        }
     }
 
     fun recordCheck(id: String, verdict: String, nowUtc: String) {
@@ -102,6 +128,10 @@ class MachineRegistry(context: Context) {
     }
 
     fun totalLabeledClips(id: String): Int = find(id)?.labeledCounts?.values?.sum() ?: 0
+
+    fun totalFalsePositives(): Int = all().sumOf { it.falsePositiveCount }
+    fun totalFalseNegatives(): Int = all().sumOf { it.falseNegativeCount }
+    fun countNeedingReenrollment(): Int = all().count { it.needsReenrollment }
 
     fun delete(id: String) {
         write(all().filterNot { it.id.equals(id, ignoreCase = true) })
@@ -130,6 +160,9 @@ class MachineRegistry(context: Context) {
         put("last_verdict", m.lastVerdict ?: JSONObject.NULL)
         put("last_checked_at_utc", m.lastCheckedAtUtc ?: JSONObject.NULL)
         put("labeled_counts", JSONObject().apply { m.labeledCounts.forEach { (k, v) -> put(k, v) } })
+        put("needs_reenrollment", m.needsReenrollment)
+        put("false_positive_count", m.falsePositiveCount)
+        put("false_negative_count", m.falseNegativeCount)
     }
 
     private fun fromJson(o: JSONObject): Machine {
@@ -147,6 +180,9 @@ class MachineRegistry(context: Context) {
             lastVerdict = if (o.isNull("last_verdict")) null else o.optString("last_verdict"),
             lastCheckedAtUtc = if (o.isNull("last_checked_at_utc")) null else o.optString("last_checked_at_utc"),
             labeledCounts = counts,
+            needsReenrollment = o.optBoolean("needs_reenrollment", false),
+            falsePositiveCount = o.optInt("false_positive_count", 0),
+            falseNegativeCount = o.optInt("false_negative_count", 0),
         )
     }
 

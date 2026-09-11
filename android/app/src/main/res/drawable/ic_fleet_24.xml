@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Minimal "fleet" mark: four machines, one grid. Used wherever the app
+     points at the full machine list rather than one selected machine.
+     Color is baked in, not applied via android:tint/app:tint at runtime —
+     tinting a vector drawable rendered invisible on this device (Samsung
+     SM-M075F / One UI), even though the resource and its binding were both
+     verified correct with aapt2. Baking the fill avoids the tint pipeline
+     entirely, which is the reliable fix, not a workaround to revisit. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#E7ECEF"
+        android:pathData="M3,3 h8 v8 h-8 z M13,3 h8 v8 h-8 z M3,13 h8 v8 h-8 z M13,13 h8 v8 h-8 z" />
+</vector>

@@ -2,15 +2,18 @@ package com.injini.app
 
 import android.app.Activity
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import kotlin.concurrent.thread
 
 /**
  * The fleet screen. A kombi rank or a generator dealer has many machines on
@@ -49,6 +52,10 @@ class MachineListActivity : AppCompatActivity() {
         findViewById<View>(R.id.addMachineButton).setOnClickListener {
             MachineForms.showAddMachineDialog(this, registry) { id -> selectAndReturn(id) }
         }
+        findViewById<View>(R.id.exportButton).setOnClickListener { exportDataset() }
+        findViewById<View>(R.id.hfSyncButton).setOnClickListener {
+            startActivity(Intent(this, HfSyncActivity::class.java))
+        }
         refreshList()
     }
 
@@ -68,6 +75,7 @@ class MachineListActivity : AppCompatActivity() {
     }
 
     private fun refreshList() {
+        refreshDatasetCard()
         listContainer.removeAllViews()
         val machines = registry.all()
         if (machines.isEmpty()) {
@@ -99,8 +107,20 @@ class MachineListActivity : AppCompatActivity() {
             val pendingView = row.findViewById<TextView>(R.id.rowPending)
             if (pending > 0) {
                 pendingView.visibility = View.VISIBLE
-                pendingView.text = "⚠  $pending recording${if (pending == 1) "" else "s"} need${if (pending == 1) "s" else ""} a verdict  —  Add verdict ›"
+                pendingView.text = "$pending recording${if (pending == 1) "" else "s"} need${if (pending == 1) "s" else ""} a verdict  —  Add verdict"
                 pendingView.setOnClickListener { verdictFlow.showQueue(m.id) }
+            }
+
+            val reenrollView = row.findViewById<TextView>(R.id.rowReenroll)
+            if (m.needsReenrollment) {
+                reenrollView.visibility = View.VISIBLE
+                reenrollView.setOnClickListener {
+                    AlertDialog.Builder(this)
+                        .setTitle("Needs re-enrollment")
+                        .setMessage("A mechanic found a real fault on ${m.id} that a live Check had read as healthy. Its enrolled fingerprint may include a bad sample. Select ${m.id} from the home screen and run Enrol again to rebuild it.")
+                        .setPositiveButton("OK", null)
+                        .show()
+                }
             }
 
             row.setOnLongClickListener { confirmDelete(m.id); true }
@@ -120,5 +140,65 @@ class MachineListActivity : AppCompatActivity() {
             .setPositiveButton("Remove") { _, _ -> registry.delete(id); refreshList() }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+
+    // ------------------------------------------------------------- dataset
+
+    /** The live answer to "have we collected enough yet" — tap for the breakdown by fault type. */
+    private fun refreshDatasetCard() {
+        val counts = clipStore.labelCounts()
+        val card = findViewById<TextView>(R.id.datasetCard)
+        card.text = "Dataset: ${counts.healthy} healthy  ·  ${counts.faulty} faulty  ·  ${counts.total} total"
+        card.setOnClickListener { showBreakdown(counts) }
+    }
+
+    private fun showBreakdown(counts: LabeledClipStore.LabelCounts) {
+        val body = buildString {
+            appendLine("Healthy: ${counts.healthy}")
+            if (counts.byFault.isEmpty()) {
+                append("No faulty clips yet.")
+            } else {
+                counts.byFault.entries.sortedByDescending { it.value }.forEach { (label, n) -> appendLine("$label: $n") }
+            }
+        }.trim()
+        AlertDialog.Builder(this)
+            .setTitle("Dataset by label")
+            .setMessage(body)
+            .setPositiveButton("OK", null)
+            .show()
+    }
+
+    /** Zips the whole corpus (confirmed + still-pending) off the background thread, then hands the result straight to the share sheet — WhatsApp is a normal target there, not a special case. */
+    private fun exportDataset() {
+        if (clipStore.clipCount() == 0 && clipStore.pendingCount() == 0) {
+            Toast.makeText(this, "No recordings yet — Enrol or Check a machine first.", Toast.LENGTH_LONG).show()
+            return
+        }
+        val progress = AlertDialog.Builder(this)
+            .setTitle("Exporting")
+            .setMessage("Zipping every recording…")
+            .setCancelable(false)
+            .create()
+        progress.show()
+        thread {
+            try {
+                val uri = DatasetExporter.export(this)
+                runOnUiThread { progress.dismiss(); shareZip(uri) }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    progress.dismiss()
+                    Toast.makeText(this, "Export failed: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    private fun shareZip(uri: Uri) {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/zip"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        startActivity(Intent.createChooser(intent, "Share Injini dataset"))
     }
 }

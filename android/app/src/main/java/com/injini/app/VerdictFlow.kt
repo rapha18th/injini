@@ -5,9 +5,11 @@ import android.view.LayoutInflater
 import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.EditText
+import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.Spinner
+import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 
 /**
@@ -28,17 +30,32 @@ class VerdictFlow(
     private val onChanged: () -> Unit,
 ) {
 
+    /**
+     * A plain AlertDialog list here used to render as inert-looking text —
+     * no visual cue that a row was the only way into the label dialog. Each
+     * row is now a chip with a ripple and a trailing chevron, the same
+     * "control, not text" fix already applied to the fleet screen's rows.
+     */
     fun showQueue(machineId: String) {
         val pending = clipStore.listPending(machineId)
         if (pending.isEmpty()) return
-        val names = pending.map {
-            "Recorded ${it.recordedAtUtc.take(16).replace('T', ' ')}  —  model said: ${it.provisionalTier.lowercase()}"
-        }
-        AlertDialog.Builder(activity)
+        val view = LayoutInflater.from(activity).inflate(R.layout.dialog_pending_queue, null)
+        val container = view.findViewById<LinearLayout>(R.id.pendingList)
+        val dialog = AlertDialog.Builder(activity)
             .setTitle("$machineId — recordings awaiting a verdict")
-            .setItems(names.toTypedArray()) { _, which -> showLabelDialog(pending[which]) }
+            .setView(view)
             .setNegativeButton("Close", null)
-            .show()
+            .create()
+        pending.forEach { clip ->
+            val row = LayoutInflater.from(activity).inflate(R.layout.item_pending_row, container, false)
+            row.findViewById<TextView>(R.id.pendingTimestamp).text =
+                "Recorded ${clip.recordedAtUtc.take(16).replace('T', ' ')}"
+            row.findViewById<TextView>(R.id.pendingTier).text =
+                "model said: ${clip.provisionalTier.lowercase()}"
+            row.setOnClickListener { dialog.dismiss(); showLabelDialog(clip) }
+            container.addView(row)
+        }
+        dialog.show()
     }
 
     private fun showLabelDialog(pending: LabeledClipStore.PendingClip) {
@@ -63,8 +80,10 @@ class VerdictFlow(
                 val display = if (faulty) spinner.selectedItem as? String ?: FaultLabel.OTHER_DISPLAY else FaultLabel.HEALTHY_DISPLAY
                 val verdict = if (faulty) verdictInput.text.toString() else ""
                 val corpusLabel = if (faulty) FaultLabel.corpusKeyFor(display, verdict) else FaultLabel.HEALTHY_CORPUS_KEY
-                clipStore.confirmPending(pending, corpusLabel, display, verdict)
+                val outcome = clipStore.confirmPending(pending, corpusLabel, display, verdict)
                 registry.recordLabeledClip(pending.machineId, corpusLabel)
+                registry.recordBenchmarkOutcome(pending.machineId, outcome)
+                reportOutcome(pending.machineId, outcome)
                 onChanged()
             }
             .setNeutralButton("Discard recording") { _, _ ->
@@ -73,5 +92,31 @@ class VerdictFlow(
             }
             .setNegativeButton("Later", null)
             .show()
+    }
+
+    /**
+     * The model's tier and the mechanic's verdict just disagreed, or they
+     * didn't. Either way that's a real benchmark result, not only a training
+     * label — surface it rather than letting it sit silently in a CSV
+     * column. A false negative (Check read HEALTHY, something was actually
+     * wrong) also marks the machine for re-enrollment: the fingerprint that
+     * produced that reading may itself include a bad sample.
+     */
+    private fun reportOutcome(machineId: String, outcome: String) {
+        when (outcome) {
+            "false_positive" -> AlertDialog.Builder(activity)
+                .setTitle("False positive recorded")
+                .setMessage("$machineId's model flagged this one for a check, and the mechanic found it healthy. Logged for the benchmark — no action needed.")
+                .setPositiveButton("OK", null)
+                .show()
+            "false_negative" -> {
+                registry.flagReenrollment(machineId)
+                AlertDialog.Builder(activity)
+                    .setTitle("Missed fault recorded")
+                    .setMessage("$machineId's model read this one as healthy, but the mechanic found a real fault. Logged as a missed detection, and $machineId is now marked for re-enrollment — its healthy fingerprint may include a bad sample.")
+                    .setPositiveButton("OK", null)
+                    .show()
+            }
+        }
     }
 }

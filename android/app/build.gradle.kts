@@ -40,5 +40,10 @@ dependencies {
     // profiling reports which provider actually executed each node.
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.19.2")
 
+    // Real multipart file upload for HfSync — hand-rolled multipart boundary
+    // strings over HttpURLConnection are easy to get subtly wrong for
+    // something that uploads real training data; OkHttp's builder is not.
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
     testImplementation("junit:junit:4.13.2")
 }

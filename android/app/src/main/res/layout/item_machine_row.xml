@@ -51,10 +51,33 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
+        android:layerType="software"
         android:background="@drawable/bg_chip"
+        android:drawableStart="@drawable/ic_warning_amber_24"
+        android:drawableEnd="@drawable/ic_chevron_24"
+        android:drawablePadding="10dp"
         android:paddingHorizontal="14dp"
         android:paddingVertical="10dp"
         android:textColor="@color/injini_amber"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <!-- A field benchmark result, not just a pending recording: this
+         machine's fingerprint once read a real fault as healthy. -->
+    <TextView
+        android:id="@+id/rowReenroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:layerType="software"
+        android:background="@drawable/bg_chip"
+        android:drawableStart="@drawable/ic_warning_red_24"
+        android:drawablePadding="10dp"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="10dp"
+        android:text="Needs re-enrollment"
+        android:textColor="@color/injini_red"
         android:textSize="13sp"
         android:textStyle="bold"
         android:visibility="gone" />

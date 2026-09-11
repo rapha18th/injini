@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Color baked in — see ic_fleet_24.xml for why runtime tint isn't used. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:strokeColor="#E0A64B"
+        android:strokeWidth="1.6"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M12,3.5 L21,20 L3,20 Z" />
+    <path
+        android:fillColor="#E0A64B"
+        android:pathData="M11.25,9.5 h1.5 v5.5 h-1.5 z" />
+    <path
+        android:fillColor="#E0A64B"
+        android:pathData="M11.25,17 h1.5 v1.5 h-1.5 z" />
+</vector>

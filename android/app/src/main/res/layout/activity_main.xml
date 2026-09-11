@@ -43,6 +43,31 @@
         app:layout_constraintTop_toBottomOf="@id/wordmark"
         app:layout_constraintStart_toStartOf="parent" />
 
+    <!-- A separate, always-visible way into the full fleet screen — not
+         folded into the dropdown, so managing machines is never a hidden
+         side effect of picking one. Anchored beside the wordmark, its own
+         row, rather than squeezed against the picker chip where it crowded
+         both controls and read as an afterthought. -->
+    <!-- Icon color is baked into ic_fleet_24 itself, not applied via tint.
+         layerType="software" works around a real device bug: on this
+         Samsung SM-M075F, a small vector drawn as an ImageView/compound-
+         drawable src renders as fully blank under hardware acceleration —
+         confirmed with aapt2 that the resource and its binding were both
+         correct, so this is a GPU/driver compositing issue, not a resource
+         one. Shape drawables used as android:background were unaffected. -->
+    <androidx.appcompat.widget.AppCompatImageButton
+        android:id="@+id/machinesButton"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layerType="software"
+        android:background="@drawable/bg_chip"
+        app:srcCompat="@drawable/ic_fleet_24"
+        android:padding="9dp"
+        android:contentDescription="Machines"
+        app:layout_constraintTop_toTopOf="@id/wordmark"
+        app:layout_constraintBottom_toBottomOf="@id/tagline"
+        app:layout_constraintEnd_toEndOf="parent" />
+
     <!-- The machine dropdown: tap to reveal every known machine plus "+ Add
          new machine", styled and worded so it reads as a control (a visible
          chevron), not as inert label text. -->
@@ -59,26 +84,6 @@
         android:textSize="14sp"
         app:layout_constraintTop_toBottomOf="@id/tagline"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toStartOf="@id/machinesButton" />
-
-    <!-- A separate, always-visible way into the full fleet screen — not
-         folded into the dropdown, so managing machines is never a hidden
-         side effect of picking one. -->
-    <androidx.appcompat.widget.AppCompatButton
-        android:id="@+id/machinesButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:layout_marginStart="8dp"
-        android:background="@drawable/bg_button"
-        android:text="Machines"
-        android:textColor="@color/injini_text"
-        android:textSize="13sp"
-        android:textAllCaps="false"
-        android:paddingHorizontal="16dp"
-        android:stateListAnimator="@null"
-        app:layout_constraintTop_toTopOf="@id/machinePicker"
-        app:layout_constraintBottom_toBottomOf="@id/machinePicker"
         app:layout_constraintEnd_toEndOf="parent" />
 
     <!-- This machine's attributes and progress, right here on the home
@@ -100,14 +105,40 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
+    <!-- Shown only once a false negative flags this machine: the fingerprint
+         built at enrolment may include a bad sample, since a Check against
+         it once read healthy on something a mechanic found genuinely wrong. -->
+    <TextView
+        android:id="@+id/reenrollBanner"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:layerType="software"
+        android:background="@drawable/bg_chip"
+        android:drawableStart="@drawable/ic_warning_red_24"
+        android:drawablePadding="10dp"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="10dp"
+        android:text="Needs re-enrollment — a mechanic found a fault this fingerprint missed."
+        android:textColor="@color/injini_red"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/machineInfo"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
     <!-- A real button, not a line of text hoping to be noticed. -->
     <androidx.appcompat.widget.AppCompatButton
         android:id="@+id/addVerdictButton"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
+        android:layerType="software"
         android:background="@drawable/bg_button"
-        android:text="⚠  Add verdict"
+        android:drawableStart="@drawable/ic_warning_amber_24"
+        android:drawablePadding="10dp"
+        android:text="Add verdict"
         android:textColor="@color/injini_amber"
         android:textSize="13sp"
         android:textStyle="bold"
@@ -115,7 +146,7 @@
         android:paddingVertical="10dp"
         android:stateListAnimator="@null"
         android:visibility="gone"
-        app:layout_constraintTop_toBottomOf="@id/machineInfo"
+        app:layout_constraintTop_toBottomOf="@id/reenrollBanner"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 

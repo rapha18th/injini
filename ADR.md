@@ -468,6 +468,207 @@ visibility; tapping a Machines-list row with 3 pending recordings selects
 that machine immediately, with no dialog in the way; tapping its separate
 "Add verdict" chip opens the queue as before.
 
+## ADR-17: field benchmark tracking, minimalist icons, and a real vector-drawable bug
+
+**Context.** Four more direct user corrections: the Machines button was
+awkwardly placed, a pending-recording's timestamp in the verdict dialog
+didn't read as tappable, there was no mechanism for the app to notice when
+its own on-device tier disagreed with what a mechanic actually found, and
+the app wanted minimalist icons instead of unicode characters (⚠, ⌄, +).
+
+**Field benchmark, not just data collection.** Every Check clip already
+queues with the model's on-device tier (`AnomalyScorer.Tier`) as a hint;
+`LabeledClipStore.confirmPending()` now also compares that tier against the
+verdict it's finally given and writes the result — `false_positive`,
+`false_negative`, or `confirmed` — into a new `benchmark_outcome` manifest
+column. A false negative (tier said HEALTHY, mechanic found a real fault)
+also flags the machine `needsReenrollment`: the fingerprint that produced
+that reading may itself include a bad sample, since it was built from only
+6 clips (see ADR-16's Open Items note on that calibration gap — this doesn't
+fix the diagonal-Mahalanobis noise, it gives the app a way to notice when
+that noise has actually mattered). Both outcomes surface immediately in a
+dialog (`VerdictFlow.reportOutcome()`), not just silently in a CSV column,
+and the fleet-wide totals now sit in "Full model results" alongside the
+DCASE numbers — this app is a live benchmark of the shipped model, not only
+a data collector, which is the whole point per the project's own framing.
+
+**A real vector-drawable bug, not a tint/theme issue.** Building the icon
+set, every single icon rendered as a totally blank shape — background chips
+showed, `src`/compound-drawable content did not, across `ImageButton`,
+`AppCompatImageButton`, and `TextView` compound drawables alike. `aapt2 dump
+xmltree` on the built APK confirmed the resource compiled and the layout
+bound to it correctly; three device-specific hypotheses (Samsung/OneUI
+tint bug, GPU hardware-acceleration compositing, `layerType="software"`)
+were tried and ruled out in turn before the actual cause surfaced: every
+vector file used `android:path` instead of the real attribute name,
+`android:pathData`. `android:path` compiles cleanly (it's a legitimate
+framework attribute, just not the one `VectorDrawable`'s path element reads)
+so nothing errors at build time — the path silently has no data, and an
+empty path draws nothing. Fixed by renaming the attribute in all five icon
+files. Lesson: when a resource "compiles fine and binds fine" but renders
+as nothing, check the actual XML attribute names against the framework
+class's real `styleable`, not just against what `aapt2` accepted — a wrong
+but legal attribute name is a silent no-op, not an error.
+
+**Machines button, verdict-queue rows.** The Machines button moved off the
+crowded picker row into its own circular icon button beside the wordmark
+(`ic_fleet_24`), freeing the picker chip to span full width. The
+pending-verdict queue (`VerdictFlow.showQueue()`) was a plain
+`AlertDialog.setItems()` list — inert-looking text with no visual cue a row
+was the only way into the label dialog. Replaced with custom chip rows
+(`item_pending_row.xml`): bold timestamp, tier subtitle, trailing chevron,
+ripple foreground — the same "control, not text" fix ADR-16 already applied
+to the fleet screen's rows, now applied here too.
+
+## ADR-18: dataset export, a live label counter, and Hugging Face as the sync target
+
+**Context.** "Exporting of the collection" was named the most important
+open piece: a way to get every recording off the phone, manually or over
+WhatsApp, plus a live tally of healthy vs. faulty clips to judge dataset
+size against. Separately, a remote sync target for phones with internet.
+
+**Export as a share-sheet target, not a bespoke transfer mechanism.**
+`DatasetExporter.export()` zips the whole `InjiniLabeled` tree (confirmed
+corpus and the still-pending queue both — nothing is excluded just because
+it hasn't been given a verdict yet) and, from Android 10 on, writes it
+through `MediaStore.Downloads` rather than app-private storage: this is the
+only scoped-storage-correct way to land a file where any file manager can
+see it, and a `MediaStore` `Uri` is natively `content://` and shareable with
+no `FileProvider` needed. Below API 29, a `FileProvider` + a direct write to
+the legacy public Downloads directory covers it instead — this app's minSdk
+is 26, and a rugged budget phone still on Android 8/9 is a real device in
+its actual market, not a hypothetical to skip. Verified live: the export
+landed in `/storage/emulated/0/Download/`, and the resulting share sheet
+listed WhatsApp, Gmail, Drive, and individual WhatsApp contacts directly —
+both halves of "collect manually or receive on WhatsApp" confirmed with one
+tap, no extra integration code for either.
+
+**Live label counter.** `LabeledClipStore.labelCounts()` scans
+`manifest.csv` for a healthy/faulty tally (plus the per-fault-type
+breakdown behind "faulty") and renders on the Machines screen as "Dataset: N
+healthy · M faulty · T total", tap-through for the breakdown. Deliberately
+no hardcoded "good dataset size" threshold baked into the UI — the numbers
+are the product, judging them is the user's call, not an opinion this app
+should assert.
+
+**Remote sync: Hugging Face over Google Drive.** Google Drive needs OAuth —
+a Google Cloud Console project, a consent screen, and (past 100 test users)
+a verification review — real bureaucratic friction for a one-person field
+tool, and it was already reachable for free: "My Drive" appears directly in
+the export share sheet above with zero extra code. Hugging Face needs only
+a personal access token, no app registration or review, and — the deciding
+factor — it closes the loop this project already runs on: the DCASE mirror
+this app's own eval pulls from, and the Kaggle notebooks that would read the
+next retrain's data, both already live on HF. A phone syncing straight into
+an HF dataset repo is one hop from field recording to next-retrain input;
+a Drive folder is an extra manual download-and-reupload step in between.
+Confirmed the exact wire contract before writing code (per this project's
+own standing rule not to assert unverified facts about external APIs): the
+Hub's JSON commit endpoint is `POST /api/datasets/{repo}/commit/{rev}`,
+bearer-token auth, `{"summary", "files":[{"path","content"(base64),
+"encoding":"base64"}]}` — implemented directly over `HttpURLConnection`, no
+`huggingface_hub` dependency, capped at 40MB (larger exports should use the
+manual Export-and-share path instead, until a chunked/LFS path is worth
+building). `HfSyncActivity` stores the token in plain (unencrypted)
+`SharedPreferences` — app-private but not at-rest encrypted — with an
+explicit recommendation in the UI to scope the token to a single repo with
+write-only access, so a compromised device's exposure stays bounded. Purely
+user-triggered, no background/scheduled sync: this app has been offline-only
+until this one feature, and stays that way except for this one explicit tap.
+
+Verified live end to end short of a real token: entering a fake token and
+repo and tapping Upload now produced a real `401 {"error":"Invalid username
+or password."}` from huggingface.co, confirming the request reaches the
+real endpoint correctly formed (right URL, right auth header shape, right
+JSON body) — it needs a real token to succeed, but every part of the wiring
+up to that point is proven, not assumed.
+
+## ADR-19: ADR-18's direct-to-HF sync was corrected — a phone can't safely hold a write token
+
+**Context.** ADR-18 shipped `HfSync`/`HfSyncActivity` pasting a personal
+Hugging Face **write** access token straight into the phone, stored in
+plain `SharedPreferences`, calling Hugging Face's commit API directly. The
+user's correction, immediately: "we can't obviously ship a bundled token
+right?" — right. Even though the token was meant to be pasted per-phone by
+whoever set it up rather than baked into the APK at build time, the actual
+threat model is the same either way: any Android app's `SharedPreferences`
+is trivially readable on a rooted device or via a backup extraction, and
+once a real Hugging Face write token is on a phone in the field, it can
+write (or be used to corrupt) the dataset repo directly, full stop. A field
+phone is exactly the device most likely to be lost, stolen, or handed to
+someone else to use.
+
+**Decision.** Interpose a small backend — **Injini Relay**
+(`hf_space/`, deployed as a Hugging Face Space) — between phones and Hugging
+Face. The relay is the only thing that ever holds the real `HF_TOKEN`, kept
+as a Space secret (Settings → Variables and secrets), never in git, never
+on a phone. Phones instead hold a separate, low-privilege `UPLOAD_API_KEY`
+that only lets them call the relay's own `/api/upload` — if that key leaks
+from a decompiled APK, the blast radius is bounded to "someone can submit an
+upload," not "someone can write to the dataset."
+
+**A private HF Space would not have solved this — it would have moved the
+same problem.** Checked before building anything (external API behavior,
+not assumed): a **private** Space requires every external HTTP caller,
+including the phone, to present a real Hugging Face account token in the
+`Authorization: Bearer` header just to reach the Space at all. That
+reintroduces exactly the thing being avoided, one layer down. The fix the
+user then pointed out, correctly: Hugging Face Pro (which this account has)
+offers a third visibility tier, **Protected** — the running app's URL stays
+publicly reachable with no HF auth required to call it, while the Space's
+own source code (`app.py`, `Dockerfile`) is hidden from public Hub browsing.
+That is the right setting here: public enough for a phone's plain HTTP call,
+private enough that the validation logic and endpoint shape aren't sitting
+in a public repo for anyone to read.
+
+**Second safeguard: every upload becomes a pull request, never a direct
+commit.** `HfApi.upload_file(..., create_pr=True)` in `hf_space/app.py`.
+This is the actual answer to "won't put you in a pickle when processing for
+training": a corrupted zip, a bad field recording, or a spam attempt against
+a leaked API key can never silently become part of what a training run
+reads — it sits as a proposed change on the dataset repo until a person
+looks at it and merges. Point Kaggle notebooks at the reviewed `main`
+branch, never at open PRs. The relay also validates before proposing
+anything (must be a real zip, must contain `manifest.csv`, capped at
+150MB), and every upload lands under its own
+`field_exports/<source>/<timestamp>_<file>` path — nothing is ever
+overwritten, so a bad batch from one device is always traceable and
+revertible without touching anyone else's contribution.
+
+**Android side**: `HfSync.kt` rewritten from a JSON+base64 POST straight to
+`huggingface.co/api/datasets/.../commit/main` to a real multipart file
+upload against the relay's `/api/upload`, using OkHttp (added as a
+dependency — hand-rolled multipart boundary strings over
+`HttpURLConnection` are easy to get subtly wrong for something that uploads
+real training data, and this is not where to find that out). `HfSyncActivity`
+now collects a relay URL and an upload key, not a Hugging Face token and a
+repo id. Verified live: a placeholder relay URL that doesn't exist yet
+produced a genuine HTTPS round trip and a clean, non-crashing "Upload
+failed" dialog with Hugging Face's own real 404 page as the body — proof
+the multipart request, file attachment, and error handling all work
+correctly, pending only a real deployed relay to succeed against.
+
+**A real bug the smoke test caught, not assumed away.** Ran the relay
+locally with fake secrets before calling any of this "done": `GET /health`
+worked immediately, but the Basic-Auth-protected manual upload page 500'd
+with `TypeError: unhashable type: 'dict'` inside Jinja2. Cause: Starlette
+changed `Jinja2Templates.TemplateResponse`'s calling convention — `request`
+must now be the first positional argument (`TemplateResponse(request, name,
+context)`), not a `"request"` key inside the context dict
+(`TemplateResponse(name, {"request": request, ...})`, the old, now-removed
+form). `requirements.txt` pins no upper bound on `fastapi`/`starlette`, so a
+fresh install resolved the current version and hit the current signature.
+Fixed both call sites in `app.py`. Then re-ran the full matrix locally
+end to end with real HTTP requests (`curl`, a synthetic zip with a real
+`manifest.csv`) rather than trusting the fix by inspection: missing API key
+→ 401, wrong API key → 401, a `.zip`-named file that isn't actually a zip →
+400, a real zip via both the phone-facing `/api/upload` route and the
+manual `/` web-form route → both correctly reached Hugging Face's real API
+and surfaced its genuine `401`/`Repository Not Found` response (expected,
+given fake `HF_TOKEN`/`HF_DATASET_REPO` in this local run) instead of
+crashing. Every guard in `app.py` is now proven against a running server,
+not just read back and assumed correct.
+
 ## Results summary (for context; full table and narrative in Injini.docx §10)
 
 Five DCASE 2025 machine types (bearing, fan, gearbox, slider, valve), CPU,

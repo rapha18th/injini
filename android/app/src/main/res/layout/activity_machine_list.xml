@@ -32,19 +32,79 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
+    <!-- The live tally: how much of a dataset this phone has actually built,
+         so there's a real answer to "have we collected enough yet" instead
+         of guessing from the machine list below. Tap for the breakdown by
+         fault type. -->
+    <TextView
+        android:id="@+id/datasetCard"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:layerType="software"
+        android:background="@drawable/bg_chip"
+        android:drawableEnd="@drawable/ic_chevron_24"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="12dp"
+        android:text="Dataset: 0 healthy  ·  0 faulty  ·  0 total"
+        android:textColor="@color/injini_text"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        app:layout_constraintTop_toBottomOf="@id/subtitle"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <androidx.appcompat.widget.AppCompatButton
+        android:id="@+id/exportButton"
+        android:layout_width="0dp"
+        android:layout_height="48dp"
+        android:layout_marginTop="10dp"
+        android:layerType="software"
+        android:background="@drawable/bg_button"
+        android:drawableStart="@drawable/ic_export_24"
+        android:drawablePadding="10dp"
+        android:text="Export dataset (.zip)"
+        android:textColor="@color/injini_amber"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:textAllCaps="false"
+        android:stateListAnimator="@null"
+        app:layout_constraintTop_toBottomOf="@id/datasetCard"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <androidx.appcompat.widget.AppCompatButton
+        android:id="@+id/hfSyncButton"
+        android:layout_width="0dp"
+        android:layout_height="44dp"
+        android:layout_marginTop="10dp"
+        android:layerType="software"
+        android:background="@drawable/bg_chip"
+        android:text="Sync to Hugging Face  ›"
+        android:textColor="@color/injini_dim"
+        android:textSize="13sp"
+        android:textAllCaps="false"
+        android:stateListAnimator="@null"
+        app:layout_constraintTop_toBottomOf="@id/exportButton"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
     <androidx.appcompat.widget.AppCompatButton
         android:id="@+id/addMachineButton"
         android:layout_width="0dp"
         android:layout_height="52dp"
         android:layout_marginTop="20dp"
+        android:layerType="software"
         android:background="@drawable/bg_button"
-        android:text="+ Add machine"
+        android:drawableStart="@drawable/ic_add_24"
+        android:drawablePadding="10dp"
+        android:text="Add machine"
         android:textColor="@color/injini_amber"
         android:textSize="15sp"
         android:textStyle="bold"
         android:letterSpacing="0.04"
         android:stateListAnimator="@null"
-        app:layout_constraintTop_toBottomOf="@id/subtitle"
+        app:layout_constraintTop_toBottomOf="@id/hfSyncButton"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 

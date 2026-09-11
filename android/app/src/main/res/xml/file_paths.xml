@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Environment.getExternalStoragePublicDirectory(DIRECTORY_DOWNLOADS), the legacy (pre-Android 10) export target. -->
+    <external-path name="downloads" path="Download/" />
+</paths>

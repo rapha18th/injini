@@ -56,7 +56,7 @@ class LabeledClipStore(private val context: Context) {
         "path", "label", "class_name", "source_key", "split",
         "display_label", "mechanic_verdict", "capture_source",
         "device", "sample_rate", "duration_s", "recorded_at_utc",
-        "engine_type", "category",
+        "engine_type", "category", "benchmark_outcome",
     )
     private val pendingHeader = listOf(
         "pending_id", "path", "machine_id", "engine_type", "category",
@@ -91,6 +91,7 @@ class LabeledClipStore(private val context: Context) {
             displayLabel, mechanicVerdict, captureSource.name,
             deviceName(), sampleRate.toString(), durationOf(pcm, sampleRate),
             MachineRegistry.nowIso(), engineType, category,
+            "", // no on-device prediction to benchmark at enrolment time
         ))
         return wav
     }
@@ -136,10 +137,22 @@ class LabeledClipStore(private val context: Context) {
 
     fun pendingCount(machineId: String? = null): Int = listPending(machineId).size
 
-    /** Moves a pending clip into the confirmed corpus under its real label, and forgets it was ever pending. */
-    fun confirmPending(pending: PendingClip, corpusLabel: String, displayLabel: String, mechanicVerdict: String) {
+    /**
+     * Moves a pending clip into the confirmed corpus under its real label,
+     * and forgets it was ever pending. Also settles the field benchmark for
+     * this one recording — the on-device tier it queued with, against the
+     * verdict it just received — and writes that outcome into the manifest
+     * alongside the label, so the dataset itself carries where the model
+     * agreed with the mechanic and where it didn't.
+     *
+     * Returns the outcome ("false_positive", "false_negative", or
+     * "confirmed") so the caller can act on it — e.g. flag a machine whose
+     * enrolled baseline just let a real fault read as healthy.
+     */
+    fun confirmPending(pending: PendingClip, corpusLabel: String, displayLabel: String, mechanicVerdict: String): String {
+        val outcome = outcomeFor(pending.provisionalTier, corpusLabel)
         val src = File(pending.path)
-        if (!src.exists()) { removePending(pending.pendingId); return }
+        if (!src.exists()) { removePending(pending.pendingId); return outcome }
         val safeLabel = corpusLabel.replace(Regex("[^A-Za-z0-9_ -]"), "_")
         val dir = File(root, safeLabel)
         dir.mkdirs()
@@ -154,8 +167,28 @@ class LabeledClipStore(private val context: Context) {
             displayLabel, mechanicVerdict, pending.captureSource,
             deviceName(), info.first.toString(), "%.2f".format(info.second),
             pending.recordedAtUtc, pending.engineType, pending.category,
+            outcome,
         ))
         removePending(pending.pendingId)
+        return outcome
+    }
+
+    /**
+     * Predicted-anomalous is any tier past HEALTHY (WATCH counts — it already
+     * told the user "worth checking"). Comparing that against whether the
+     * confirmed label is the healthy corpus key gives the same false-
+     * positive/false-negative framing as any other binary detector, which is
+     * the point: this app is a field benchmark of the on-device model, not
+     * just a data collector.
+     */
+    private fun outcomeFor(provisionalTier: String, corpusLabel: String): String {
+        val predictedFaulty = provisionalTier != AnomalyScorer.Tier.HEALTHY.name
+        val actualFaulty = corpusLabel != FaultLabel.HEALTHY_CORPUS_KEY
+        return when {
+            predictedFaulty && !actualFaulty -> "false_positive"
+            !predictedFaulty && actualFaulty -> "false_negative"
+            else -> "confirmed"
+        }
     }
 
     /** Discards a pending clip with no label — a bad recording, or one nobody ever got a verdict for. */
@@ -175,6 +208,26 @@ class LabeledClipStore(private val context: Context) {
     // --------------------------------------------------------------- totals
 
     fun clipCount(): Int = if (!manifest.exists()) 0 else (manifest.readLines().size - 1).coerceAtLeast(0)
+
+    /** healthy vs. faulty tally across every confirmed clip, plus the per-class breakdown behind "faulty" — the live progress read against "is this a good dataset yet." */
+    data class LabelCounts(val healthy: Int, val byFault: Map<String, Int>) {
+        val faulty: Int get() = byFault.values.sum()
+        val total: Int get() = healthy + faulty
+    }
+
+    fun labelCounts(): LabelCounts {
+        if (!manifest.exists()) return LabelCounts(0, emptyMap())
+        var healthy = 0
+        val faults = LinkedHashMap<String, Int>()
+        manifest.readLines().drop(1).forEach { line ->
+            val c = parseCsvLine(line)
+            if (c.size < 2) return@forEach
+            val label = c[1]
+            if (label == FaultLabel.HEALTHY_CORPUS_KEY) healthy++
+            else if (label.isNotBlank()) faults[label] = (faults[label] ?: 0) + 1
+        }
+        return LabelCounts(healthy, faults)
+    }
 
     // --------------------------------------------------------------- helpers
 
