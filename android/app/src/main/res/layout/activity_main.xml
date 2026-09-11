@@ -1,5 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  On a targetSdk-35 edge-to-edge device the window draws full-screen by
+  default and the nav bar sits as a transparent overlay on top, which
+  silently eats touches on anything laid out underneath it — "Full model
+  results" was drawn right at the very bottom and every tap on it landed on
+  the nav bar's window instead of ours. android:fitsSystemWindows="true" also
+  fixes the overlap but zeroes this view's own padding as a side effect
+  instead of adding to it, so the fix is a manual window-insets listener in
+  MainActivity.onCreate that adds the bar insets on top of this 28dp base
+  padding rather than replacing it.
+-->
 <androidx.constraintlayout.widget.ConstraintLayout
+    android:id="@+id/rootLayout"
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"

@@ -65,15 +65,26 @@ Every embedder configuration beats the reproduced baseline. `mn10_as` with kNN e
 ```bash
 cp models/injini_mn10_as_int8.onnx models/injini_mn10_as_fp32.onnx android/app/src/main/assets/
 cd android && ./gradlew assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Two flows: **Enrol** records six healthy ten-second clips of a machine and stores its fingerprint; **Check** records one clip and returns a three-tier verdict. The "Full model results" dialog shows the matched FP32-vs-INT8 embedder benchmark and the execution-provider trace, same methodology as SiloSense.
+Two flows: **Enrol** records six healthy ten-second clips of a machine and stores its fingerprint; **Check** records one clip and returns a three-tier verdict. The "Full model results" dialog shows the matched FP32-vs-INT8 embedder benchmark and the execution-provider trace, same methodology as SiloSense. Custom adaptive icon: a five-bar amber waveform on the app's own instrument-panel dark ground, not a placeholder.
 
 Feature parity (Kotlin vs the Python reference):
 
 ```bash
 cd android && ./gradlew testDebugUnitTest --tests "com.injini.app.AudioFeaturesParityTest"
 ```
+
+### On-device, 2026-09-11 (Samsung SM-M075F, not the originally planned M16)
+
+| Measurement | INT8 | FP32 |
+|---|---|---|
+| Steady-state embed | 44.1 ms | 87.5 ms |
+| Load time | 241.7 ms | 87.1 ms |
+| Executed per node | CPUExecutionProvider: all 3670 nodes | same |
+
+XNNPACK registered but ran nothing on this device — the opposite of SiloSense's Galaxy M16, where it did all the real work. Process memory 178.2 MB PSS, thermal status LIGHT. See [ADR-12](ADR.md#adr-12-a-verdict-shown-and-immediately-overwritten-by-the-idle-reset) and [ADR-13](ADR.md#adr-13-the-results-link-sat-underneath-the-system-navigation-bar) for two real bugs the first on-device run caught, and the note on unvalidated 6-clip on-device calibration in [Open items](ADR.md#open-items).
 
 ## Local artefacts measured so far
 

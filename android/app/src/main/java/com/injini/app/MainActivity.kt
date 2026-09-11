@@ -10,6 +10,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import kotlin.concurrent.thread
 
 /**
@@ -63,6 +65,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        applySystemBarInsetsAsExtraPadding()
         statusWord = findViewById(R.id.statusWord)
         detailText = findViewById(R.id.detailText)
         latencyChip = findViewById(R.id.latencyChip)
@@ -83,6 +86,27 @@ class MainActivity : AppCompatActivity() {
         resultsLink.setOnClickListener { showResults() }
     }
 
+    /**
+     * Edge-to-edge devices draw the window full-screen with the nav bar as a
+     * transparent overlay on top, which silently eats touches on anything
+     * laid out underneath it — see the note on the root layout in
+     * activity_main.xml. Adds the system bar insets on top of the layout's
+     * own 28dp padding (captured once here) rather than replacing it, which
+     * is what android:fitsSystemWindows="true" does instead.
+     */
+    private fun applySystemBarInsetsAsExtraPadding() {
+        val root = findViewById<android.view.View>(R.id.rootLayout)
+        val baseLeft = root.paddingLeft
+        val baseTop = root.paddingTop
+        val baseRight = root.paddingRight
+        val baseBottom = root.paddingBottom
+        ViewCompat.setOnApplyWindowInsetsListener(root) { v, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            v.setPadding(baseLeft + bars.left, baseTop + bars.top, baseRight + bars.right, baseBottom + bars.bottom)
+            insets
+        }
+    }
+
     private fun ensureMic(then: () -> Unit) {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
             == PackageManager.PERMISSION_GRANTED) then() else askMic.launch(Manifest.permission.RECORD_AUDIO)
@@ -95,12 +119,17 @@ class MainActivity : AppCompatActivity() {
         scorer = runCatching { AnomalyScorer.fromJson(json) }.getOrNull()
     }
 
-    private fun setIdle() {
+    /** Re-enable the buttons after a background op, without touching whatever is on screen. */
+    private fun refreshButtons() {
         busy = false
         checkButton.isEnabled = embedder != null && scorer != null
         enrolButton.isEnabled = embedder != null
         checkButton.alpha = if (checkButton.isEnabled) 1f else 0.4f
         enrolButton.alpha = if (enrolButton.isEnabled) 1f else 0.4f
+    }
+
+    private fun setIdle() {
+        refreshButtons()
         if (scorer == null) {
             status("NOT ENROLLED", "Enrol this machine first: $ENROL_CLIPS ten-second clips while it runs normally.")
         } else {
@@ -162,7 +191,7 @@ class MainActivity : AppCompatActivity() {
                     else ""
                     status(word, "$line\n\nscore ${"%.3f".format(r.score)}  " +
                         "(kNN ${"%.3f".format(r.knnDistance)}, Mahalanobis ${"%.3f".format(r.mahalanobis)})$src")
-                    setIdle()
+                    refreshButtons()
                 }
             } catch (ex: Exception) {
                 runOnUiThread { status("CHECK FAILED", ex.message ?: "unknown error"); setIdle() }

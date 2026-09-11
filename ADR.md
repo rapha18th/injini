@@ -263,6 +263,58 @@ Material's own outlined/text button styles configured with the right
 attributes (`app:strokeColor`, `app:backgroundTint`, etc.) — a plain
 `android:background` on `<Button>` is silently a no-op.
 
+## ADR-12: a verdict shown and immediately overwritten by the idle reset
+
+**Context.** Second on-device screenshot: `runCheck()`'s success path called
+`status(word, ...)` to show the three-tier verdict, then called `setIdle()`
+in the same `runOnUiThread` block. `setIdle()` unconditionally calls its own
+`status(...)` to show either "NOT ENROLLED" or "READY: Enrolled...", which
+ran immediately after and overwrote the verdict before a human eye could ever
+see it. The screenshot simply showed "READY" with the default enrolled
+message, no sign anything had gone wrong, because nothing crashed — the app
+was doing exactly what the code said, the code just said the wrong thing.
+
+**Fix.** Split `setIdle()`'s button-enabling logic out into `refreshButtons()`
+(touches only `isEnabled`/`alpha`, never the status text), and call that from
+`runCheck()`'s success path instead of `setIdle()`. `setIdle()` itself still
+calls `refreshButtons()` plus sets the default message, used everywhere a
+default message is actually correct (startup, after Enrol, on error paths).
+
+**Lesson.** A function whose name describes an app-level *state* ("idle") is
+a poor place to also hide UI *side effects* that not every caller wants.
+Every call site needs to be re-read once such a function's meaning depends on
+what else it happens to be doing under the hood.
+
+## ADR-13: the results link sat underneath the system navigation bar
+
+**Context.** Third on-device interaction: tapping "Full model results" did
+nothing, twice, with no crash and no log line. A `uiautomator dump` gave the
+exact bounds: `resultsLink` at `[265,1514][455,1547]`, `navigationBarBackground`
+at `[0,1510][720,1600]` — the link sat entirely inside the nav bar's own
+window, which silently owns any touch in that region on an edge-to-edge
+(targetSdk 35) window. The link wasn't broken; it was drawn under a pane of
+glass that intercepted every tap before it reached the app.
+
+**First attempted fix, also wrong.** `android:fitsSystemWindows="true"` on
+the root layout does reserve the inset space and stops the overlap, but it
+*replaces* the view's own `android:padding` with the inset-derived padding
+rather than adding to it — the fix traded a hidden button for text sitting
+flush against the left and right screen edges, losing the 28dp margin used
+everywhere else in the layout.
+
+**Real fix.** A manual `ViewCompat.setOnApplyWindowInsetsListener` on the
+root view (`MainActivity.applySystemBarInsetsAsExtraPadding()`), which
+captures the layout's own padding once and adds the system bar insets on top
+of it rather than replacing it.
+
+**Lesson.** "It isn't clickable" and "it's genuinely broken" look identical
+from a screenshot alone on a device with on-screen navigation. `uiautomator
+dump` (bounds of every view, including the system nav bar) found this in
+under a minute where guessing tap coordinates from screenshots had already
+failed twice. And a one-line insets fix is not automatically an equivalent
+fix — `fitsSystemWindows` and a manual insets listener solve the same overlap
+problem through different mechanisms with different side effects.
+
 ## Results summary (for context; full table and narrative in Injini.docx §10)
 
 Five DCASE 2025 machine types (bearing, fan, gearbox, slider, valve), CPU,
@@ -294,7 +346,27 @@ five machine types, but a fair, matched comparison.
   single-vehicle, randomly-split data gets — expected, given a source-disjoint
   split on a messy, unlicensed-provenance public corpus. Not a target to beat,
   a number to report honestly.
-- **On-device measurement**: latency, execution-provider trace, memory,
-  thermal, battery all need a real Galaxy M16 (or equivalent), not Kaggle.
+- **On-device measurement**: resolved, on a Samsung SM-M075F (not the M16
+  originally planned — whatever phone was connected). mn10_as embedder,
+  INT8 44.05 ms steady-state (min 36.24), FP32 87.54 ms (min 79.54). Load
+  time INT8 241.7 ms vs FP32 87.1 ms, the same QDQ-compile-on-first-use cost
+  SiloSense saw. Executed-per-node trace: `CPUExecutionProvider=3670` — on
+  this device XNNPACK registered but ran nothing, everything actually
+  executed on plain CPU, unlike SiloSense's Galaxy M16 where XNNPACK did the
+  real work. Process memory 178,224 KB PSS, thermal status LIGHT.
 - **MAC counting**: `export/quantize.py`'s `onnx_macs()` is a rough Conv/Gemm
   estimate from static shapes where present, not a full profiler count.
+- **On-device calibration is unvalidated with a 6-clip enrollment.** A real
+  Check against a freshly-enrolled machine, minutes later in the same
+  environment, scored "GET IT LOOKED AT" (0.895) rather than healthy. The
+  on-device diagonal Mahalanobis (`AnomalyScorer.kt`) estimates a per-dimension
+  variance from only 6 healthy clips across a 960-d embedding; any dimension
+  with near-zero variance in that tiny sample produces a huge inverse-variance
+  weight, so an ordinary embedding wobble in one dimension can dominate the
+  score. This is a real calibration gap, not confirmed as a bug: the DCASE
+  evaluation's full-covariance Mahalanobis (Section 10's numbers) was run on
+  hundreds of training clips, not 6, and was never meant to validate this
+  diagonal on-device approximation. Needs either more enrollment clips, a
+  regularised/shrunk variance estimate, or a validated bounds recalibration
+  before the three-tier verdict can be trusted the way Section 10's DCASE
+  numbers can.
