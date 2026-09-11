@@ -1,0 +1,346 @@
+{
+  "generated": "2026-09-11 01:17 UTC",
+  "results": [
+    {
+      "file": "eval_dcase_ae_baseline.json",
+      "backend": "dcase_ae_baseline_mse",
+      "scorer": null,
+      "official_score": 0.5471670413640833,
+      "mean_auc": 0.5599200000000001,
+      "macro_f1": null,
+      "mean_pauc": 0.534,
+      "whiten": null,
+      "per_machine": {
+        "bearing": {
+          "auc_source": 0.6136,
+          "auc_target": 0.5728,
+          "pauc": 0.6068421052631578
+        },
+        "fan": {
+          "auc_source": 0.5384,
+          "auc_target": 0.5612,
+          "pauc": 0.49157894736842106
+        },
+        "gearbox": {
+          "auc_source": 0.6168,
+          "auc_target": 0.5836,
+          "pauc": 0.5405263157894737
+        },
+        "slider": {
+          "auc_source": 0.5940000000000001,
+          "auc_target": 0.5336,
+          "pauc": 0.5273684210526316
+        },
+        "valve": {
+          "auc_source": 0.4484,
+          "auc_target": 0.5368,
+          "pauc": 0.5036842105263157
+        }
+      }
+    },
+    {
+      "file": "eval_mn04_fp32_knn_w128.json",
+      "backend": "onnx:models/injini_mn04_as_fp32.onnx",
+      "scorer": "knn",
+      "official_score": 0.592754600461978,
+      "mean_auc": 0.62968,
+      "macro_f1": null,
+      "mean_pauc": 0.5498947368421052,
+      "whiten": 128,
+      "per_machine": {
+        "bearing": {
+          "auc_source": 0.6664000000000002,
+          "auc_target": 0.522,
+          "pauc": 0.5231578947368422,
+          "n_train": 1000,
+          "n_test": 200
+        },
+        "fan": {
+          "auc_source": 0.602,
+          "auc_target": 0.5824,
+          "pauc": 0.5110526315789473,
+          "n_train": 1000,
+          "n_test": 200
+        },
+        "gearbox": {
+          "auc_source": 0.53,
+          "auc_target": 0.5696,
+          "pauc": 0.5357894736842105,
+          "n_train": 1000,
+          "n_test": 200
+        },
+        "slider": {
+          "auc_source": 0.7456,
+          "auc_target": 0.5952,
+          "pauc": 0.5436842105263158,
+          "n_train": 1000,
+          "n_test": 200
+        },
+        "valve": {
+          "auc_source": 0.772,
+          "auc_target": 0.7116,
+          "pauc": 0.6357894736842105,
+          "n_train": 1000,
+          "n_test": 200
+        }
+      }
+    },
+    {
+      "file": "eval_mn04_int8_knn_w128.json",
+      "backend": "onnx:models/injini_mn04_as_int8.onnx",
+      "scorer": "knn",
+      "official_score": 0.6023708936447081,
+      "mean_auc": 0.6437600000000001,
+      "macro_f1": null,
+      "mean_pauc": 0.5458947368421052,
+      "whiten": 128,
+      "per_machine": {
+        "bearing": {
+          "auc_source": 0.7016,
+          "auc_target": 0.5984,
+          "pauc": 0.5489473684210526,
+          "n_train": 1000,
+          "n_test": 200
+        },
+        "fan": {
+          "auc_source": 0.6196000000000002,
+          "auc_target": 0.5784,
+          "pauc": 0.5252631578947369,
+          "n_train": 1000,
+          "n_test": 200
+        },
+        "gearbox": {
+          "auc_source": 0.5404,
+          "auc_target": 0.5932,
+          "pauc": 0.541578947368421,
+          "n_train": 1000,
+          "n_test": 200
+        },
+        "slider": {
+          "auc_source": 0.7624,
+          "auc_target": 0.6099999999999999,
+          "pauc": 0.5410526315789473,
+          "n_train": 1000,
+          "n_test": 200
+        },
+        "valve": {
+          "auc_source": 0.7747999999999999,
+          "auc_target": 0.6588,
+          "pauc": 0.5726315789473684,
+          "n_train": 1000,
+          "n_test": 200
+        }
+      }
+    },
+    {
+      "file": "eval_mn10_fp32_knn_w0.json",
+      "backend": "onnx:models/injini_mn10_as_fp32.onnx",
+      "scorer": "knn",
+      "official_score": 0.5845772970423226,
+      "mean_auc": 0.6241999999999999,
+      "macro_f1": null,
+      "mean_pauc": 0.5574736842105265,
+      "whiten": 0,
+      "per_machine": {
+        "bearing": {
+          "auc_source": 0.5836,
+          "auc_target": 0.49,
+          "pauc": 0.51,
+          "n_train": 1000,
+          "n_test": 200
+        },
+        "fan": {
+          "auc_source": 0.5808,
+          "auc_target": 0.5347999999999999,
+          "pauc": 0.5157894736842106,
+          "n_train": 1000,
+          "n_test": 200
+        },
+        "gearbox": {
+          "auc_source": 0.5751999999999999,
+          "auc_target": 0.5516,
+          "pauc": 0.5326315789473685,
+          "n_train": 1000,
+          "n_test": 200
+        },
+        "slider": {
+          "auc_source": 0.6968,
+          "auc_target": 0.5644,
+          "pauc": 0.5252631578947369,
+          "n_train": 1000,
+          "n_test": 200
+        },
+        "valve": {
+          "auc_source": 0.952,
+          "auc_target": 0.7128,
+          "pauc": 0.7036842105263158,
+          "n_train": 1000,
+          "n_test": 200
+        }
+      }
+    },
+    {
+      "file": "eval_mn10_fp32_knn_w128.json",
+      "backend": "onnx:models/injini_mn10_as_fp32.onnx",
+      "scorer": "knn",
+      "official_score": 0.6127044714075796,
+      "mean_auc": 0.65524,
+      "macro_f1": null,
+      "mean_pauc": 0.5570526315789474,
+      "whiten": 128,
+      "per_machine": {
+        "bearing": {
+          "auc_source": 0.6172,
+          "auc_target": 0.6320000000000001,
+          "pauc": 0.5557894736842105,
+          "n_train": 1000,
+          "n_test": 200
+        },
+        "fan": {
+          "auc_source": 0.6028,
+          "auc_target": 0.5456,
+          "pauc": 0.5284210526315789,
+          "n_train": 1000,
+          "n_test": 200
+        },
+        "gearbox": {
+          "auc_source": 0.5892000000000001,
+          "auc_target": 0.5783999999999999,
+          "pauc": 0.5526315789473684,
+          "n_train": 1000,
+          "n_test": 200
+        },
+        "slider": {
+          "auc_source": 0.8068000000000001,
+          "auc_target": 0.6868,
+          "pauc": 0.5594736842105263,
+          "n_train": 1000,
+          "n_test": 200
+        },
+        "valve": {
+          "auc_source": 0.762,
+          "auc_target": 0.7316000000000001,
+          "pauc": 0.5889473684210527,
+          "n_train": 1000,
+          "n_test": 200
+        }
+      }
+    },
+    {
+      "file": "eval_mn10_fp32_maha_w128.json",
+      "backend": "onnx:models/injini_mn10_as_fp32.onnx",
+      "scorer": "maha",
+      "official_score": 0.6158226814586993,
+      "mean_auc": 0.661,
+      "macro_f1": null,
+      "mean_pauc": 0.5656842105263158,
+      "whiten": 128,
+      "per_machine": {
+        "bearing": {
+          "auc_source": 0.5824,
+          "auc_target": 0.6215999999999999,
+          "pauc": 0.5557894736842105,
+          "n_train": 1000,
+          "n_test": 200
+        },
+        "fan": {
+          "auc_source": 0.5619999999999999,
+          "auc_target": 0.582,
+          "pauc": 0.53,
+          "n_train": 1000,
+          "n_test": 200
+        },
+        "gearbox": {
+          "auc_source": 0.626,
+          "auc_target": 0.5652,
+          "pauc": 0.5336842105263158,
+          "n_train": 1000,
+          "n_test": 200
+        },
+        "slider": {
+          "auc_source": 0.7192,
+          "auc_target": 0.7203999999999999,
+          "pauc": 0.541578947368421,
+          "n_train": 1000,
+          "n_test": 200
+        },
+        "valve": {
+          "auc_source": 0.9084000000000001,
+          "auc_target": 0.7228,
+          "pauc": 0.6673684210526316,
+          "n_train": 1000,
+          "n_test": 200
+        }
+      }
+    },
+    {
+      "file": "eval_mn10_int8_knn_w128.json",
+      "backend": "onnx:models/injini_mn10_as_int8.onnx",
+      "scorer": "knn",
+      "official_score": 0.5992423554423221,
+      "mean_auc": 0.63996,
+      "macro_f1": null,
+      "mean_pauc": 0.5411578947368422,
+      "whiten": 128,
+      "per_machine": {
+        "bearing": {
+          "auc_source": 0.6424000000000001,
+          "auc_target": 0.6456,
+          "pauc": 0.5384210526315789,
+          "n_train": 1000,
+          "n_test": 200
+        },
+        "fan": {
+          "auc_source": 0.6335999999999999,
+          "auc_target": 0.5704,
+          "pauc": 0.5105263157894737,
+          "n_train": 1000,
+          "n_test": 200
+        },
+        "gearbox": {
+          "auc_source": 0.544,
+          "auc_target": 0.6152,
+          "pauc": 0.5736842105263158,
+          "n_train": 1000,
+          "n_test": 200
+        },
+        "slider": {
+          "auc_source": 0.7859999999999999,
+          "auc_target": 0.6056,
+          "pauc": 0.5184210526315789,
+          "n_train": 1000,
+          "n_test": 200
+        },
+        "valve": {
+          "auc_source": 0.686,
+          "auc_target": 0.6708000000000001,
+          "pauc": 0.5647368421052632,
+          "n_train": 1000,
+          "n_test": 200
+        }
+      }
+    }
+  ],
+  "quant": {
+    "injini_mn04_as_int8_quant_report.json": {
+      "fp32_onnx": "models/injini_mn04_as_fp32.onnx",
+      "int8_onnx": "models/injini_mn04_as_int8.onnx",
+      "fp32_mb": 2.138,
+      "int8_mb": 0.934,
+      "size_ratio": 2.29,
+      "approx_macs": 247808,
+      "n_calibration": 256,
+      "quant": "static QDQ INT8, per-channel weights, MinMax"
+    },
+    "injini_mn10_as_int8_quant_report.json": {
+      "fp32_onnx": "models/injini_mn10_as_fp32.onnx",
+      "int8_onnx": "models/injini_mn10_as_int8.onnx",
+      "fp32_mb": 11.931,
+      "int8_mb": 3.547,
+      "size_ratio": 3.36,
+      "approx_macs": 1507200,
+      "n_calibration": 256,
+      "quant": "static QDQ INT8, per-channel weights, MinMax"
+    }
+  }
+}
