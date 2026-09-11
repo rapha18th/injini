@@ -56,6 +56,8 @@ python src/eval_dcase.py   --backend onnx:models/injini_mn10_as_int8.onnx --scor
 | mn04_as, whitened, kNN | 0.593 | 0.630 |
 | mn04_as, whitened, kNN, INT8 | 0.602 | 0.644 |
 
+Supervised fault-ID head (secondary mode): **0.362 macro F1** across 12 classes, source-disjoint split, mn10_as embeddings — well below the ~98-99% clean-data ceiling, which is expected on a source-disjoint split of a messy, unlicensed-provenance public corpus (see [ADR-10](ADR.md#adr-10-a-shared-kaggle-input-mount-can-silently-contaminate-a-recursive-glob) for a contamination bug this caught before it reached the paper).
+
 Every embedder configuration beats the reproduced baseline. `mn10_as` with kNN edges past the PaSST reference with the same scorer (0.613 vs 0.596) — directional given PaSST ran capped to CPU and five machine types, but a fair, matched comparison. Full narrative and the whitening ablation in `Injini.docx` §10.
 
 ## Android

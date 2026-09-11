@@ -243,6 +243,9 @@ Five DCASE 2025 machine types (bearing, fan, gearbox, slider, valve), CPU,
 | mn04_as, whitened, kNN | 0.593 | 0.630 |
 | mn04_as, whitened, kNN, INT8 | 0.602 | 0.644 |
 
+Supervised fault-ID head (secondary mode, not the table above's metric):
+0.362 macro F1, 12 classes, source-disjoint split, mn10_as FP32 embeddings.
+
 Every embedder configuration beats the reproduced baseline. mn10_as with kNN
 edges past the PaSST transformer reference with the same scorer (0.613 vs
 0.596) — directional, not definitive, since PaSST ran capped to CPU and to
@@ -250,10 +253,12 @@ five machine types, but a fair, matched comparison.
 
 ## Open items
 
-- **Fault-ID head**: the first clean number, 0.427 macro F1, turned out to be
-  over a contaminated 25-class problem (ADR-10). The fix is in and verified
-  against a synthetic tree; a rerun (`injini-faultid` kernel v2) was in flight
-  as of 2026-09-11.
+- **Fault-ID head**: resolved. 0.362 macro F1 over the real 12 fault classes,
+  8550 train / 1888 val, 332 source recordings, source-disjoint split
+  (`models/faultid_mn10_as_fp32.json`). Well below the ~98-99% ceiling clean,
+  single-vehicle, randomly-split data gets — expected, given a source-disjoint
+  split on a messy, unlicensed-provenance public corpus. Not a target to beat,
+  a number to report honestly.
 - **On-device measurement**: latency, execution-provider trace, memory,
   thermal, battery all need a real Galaxy M16 (or equivalent), not Kaggle.
 - **MAC counting**: `export/quantize.py`'s `onnx_macs()` is a rough Conv/Gemm

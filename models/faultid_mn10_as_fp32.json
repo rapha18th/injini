@@ -1,0 +1,20 @@
+{
+  "backend": "onnx:models/injini_mn10_as_fp32.onnx",
+  "macro_f1": 0.3619886932238474,
+  "n_train": 8550,
+  "n_val": 1888,
+  "classes": [
+    "Alternator Bearing Noise",
+    "Chain Noise",
+    "Engine kanocking",
+    "Exhaust leak",
+    "Normal",
+    "Rod knock",
+    "Timing belt",
+    "Vacuum leak",
+    "Valve tapping",
+    "Worn Pulley Noise",
+    "crankshaft bearing noise",
+    "piston slap"
+  ]
+}
