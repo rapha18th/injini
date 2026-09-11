@@ -18,7 +18,9 @@ See `Injini.docx` in the Sensing Work set for the full argument, the history, th
 
 ## Evaluation
 
-Every claim is anchored to a published DCASE figure.
+Every claim is anchored to a published DCASE figure. Data comes from the public
+HuggingFace mirror `HTill/dcase2025_task2_dev` by default (`--source hf`), not
+Zenodo directly — Zenodo has been unreliable, see [ADR-4](ADR.md#adr-4-kaggle-specific-data-source-has-to-be-resilient-not-clever).
 
 ```bash
 pip install -r requirements.txt
@@ -31,19 +33,30 @@ wget -P vendor_efficientat/resources \
   https://github.com/fschmid56/EfficientAT/releases/download/v0.0.1/mn04_as_mAP_432.pt
 python src/features.py                       # cache the Kaldi mel matrix
 
-# DCASE 2025 Task 2 development set (CC BY-NC-SA 4.0, ~2.3 GB)
-python src/fetch_dcase.py --out data/dcase2025_dev
-
-# baseline, reference ceiling, then the phone pipeline
-python src/baseline_ae.py  --root data/dcase2025_dev --epochs 100
-python src/eval_dcase.py   --root data/dcase2025_dev --backend passt --scorer maha
+# baseline, reference ceiling, then the phone pipeline — all default to the HF mirror
+python src/baseline_ae.py  --epochs 100
+python src/eval_dcase.py   --backend passt --scorer knn
 python src/embedder.py     --name mn10_as --out models/injini_mn10_as_fp32.onnx
-python src/eval_dcase.py   --root data/dcase2025_dev --backend onnx:models/injini_mn10_as_fp32.onnx
-python export/quantize.py  --fp32 models/injini_mn10_as_fp32.onnx --calib-dir data/dcase2025_dev --n-calib 256
-python src/eval_dcase.py   --root data/dcase2025_dev --backend onnx:models/injini_mn10_as_int8.onnx
+python src/eval_dcase.py   --backend onnx:models/injini_mn10_as_fp32.onnx --scorer knn
+python export/quantize.py  --fp32 models/injini_mn10_as_fp32.onnx --calib-dir data/calib --n-calib 256
+python src/eval_dcase.py   --backend onnx:models/injini_mn10_as_int8.onnx --scorer knn
 ```
 
-`notebooks/injini_train.ipynb` (built by `notebooks/build_notebook.py`) runs the whole sequence on Kaggle.
+`notebooks/injini_train.ipynb` (built by `notebooks/build_notebook.py`) runs the whole sequence on Kaggle, self-contained: no private dataset, no repo of ours to clone (see [ADR-4](ADR.md#adr-4-kaggle-specific-data-source-has-to-be-resilient-not-clever)). `notebooks/injini_faultid_only.ipynb` reruns just the supervised head.
+
+### Results, 2026-09-11 (Kaggle, CPU, five DCASE machine types)
+
+| System | Official score | Mean AUC |
+|---|---|---|
+| DCASE autoencoder baseline, reproduced | 0.547 | 0.560 |
+| PaSST transformer, whitened, kNN | 0.596 | 0.637 |
+| **mn10_as, whitened, Mahalanobis (best)** | **0.616** | **0.661** |
+| mn10_as, whitened, kNN | 0.613 | 0.655 |
+| mn10_as, whitened, kNN, INT8 | 0.599 | 0.640 |
+| mn04_as, whitened, kNN | 0.593 | 0.630 |
+| mn04_as, whitened, kNN, INT8 | 0.602 | 0.644 |
+
+Every embedder configuration beats the reproduced baseline. `mn10_as` with kNN edges past the PaSST reference with the same scorer (0.613 vs 0.596) — directional given PaSST ran capped to CPU and five machine types, but a fair, matched comparison. Full narrative and the whitening ablation in `Injini.docx` §10.
 
 ## Android
 
@@ -68,6 +81,20 @@ cd android && ./gradlew testDebugUnitTest --tests "com.injini.app.AudioFeaturesP
 | `mn04_as` | 0.52 M | 2.14 MB | 0.93 MB |
 
 AUC numbers on DCASE come from the Kaggle run and land in `Injini.docx` Section 10.
+
+## Known issues and gotchas
+
+The short version; the full incident log with context and fixes is [ADR.md](ADR.md).
+
+- **A brand-new private Kaggle dataset does not reliably mount into a kernel started right after creation**, even when it shows `status: ready`. The notebook is now fully self-contained (writes its own code, clones public EfficientAT, reads a public HF mirror) rather than depending on a dataset of ours.
+- **Zenodo was down for an extended period** (504 on both the pretty URL and the bare REST API). The DCASE dev set now comes from a public HuggingFace mirror instead.
+- **That HF mirror is incomplete**: it holds 5 of the 7 official DCASE 2025 machine types. ToyCar and ToyTrain are missing. Every result here is over bearing/fan/gearbox/slider/valve.
+- **A Kaggle public dataset does not always mount at `/kaggle/input/<slug>`.** `zeyadzsm/engine-sounds` mounted at `/kaggle/input/datasets`, a shared folder. Scan `/kaggle/input/*` for the directory that actually has your files; don't hardcode the path.
+- **Kaggle's current GPU image (`torch 2.10+cu128`) dropped Tesla P100 support.** `torch.cuda.is_available()` still returns `True`; the failure only appears on the first real kernel launch. Everything here defaults to CPU.
+- **A hand-rolled partial-AUC metric returned `p/2` for a random scorer instead of 0.5**, which crushed every score on the first real run and looked like total failure. Fixed to match `sklearn.metrics.roc_auc_score(max_fpr=p)` exactly; validate any hand-rolled metric against a reference on synthetic data before trusting it on real results.
+- **A raw, unwhitened Mahalanobis distance on a frozen embedding sits at baseline, not above it.** Whitening plus per-machine score normalisation is what earns the lift over baseline — verified with a direct ablation, not assumed.
+- **Materialising every clip's log-mel for a large split before batching OOM-kills the process with no traceback.** Fine at ~1000 clips/split (the DCASE evaluation), fatal at 20,000 (the fault-ID corpus). Embedding now streams in fixed-size chunks.
+- **`kaggle kernels output` downloads your entire `/kaggle/working` tree.** Keep the working directory in `/tmp` and copy only the deliverables out at the end, or the output pull never finishes.
 
 ## Licences
 
