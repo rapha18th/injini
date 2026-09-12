@@ -1,0 +1,174 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 2050" width="1040" height="2050">
+<rect x="0" y="0" width="1040" height="2050" fill="#0B0E11" id="bgrect"/>
+<text x="40" y="46" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="800" letter-spacing="2" fill="#E0A64B" text-anchor="start">INJINI</text>
+<text x="40" y="74" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" letter-spacing="0" fill="#8A97A0" text-anchor="start">Data to deployment, end to end.</text>
+<text x="40" y="108" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="700" letter-spacing="1" fill="#E0A64B" text-anchor="start">1. DATA</text>
+<rect x="40" y="122" width="304.0" height="135" rx="10" fill="#14181D" stroke="#232A31" stroke-width="1.5"/>
+<text x="56" y="150" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#E7ECEF">DCASE MIMII + ToyADMOS</text>
+<text x="56" y="170" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">HF mirror: HTill/dcase2025_task2_dev</text>
+<text x="56" y="187" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">5 of 7 machine types</text>
+<text x="56" y="204" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">the public benchmark</text>
+<rect x="368.0" y="122" width="304.0" height="135" rx="10" fill="#14181D" stroke="#232A31" stroke-width="1.5"/>
+<text x="384.0" y="150" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#E7ECEF">Kaggle engine-sounds</text>
+<text x="384.0" y="170" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">zeyadzsm/engine-sounds, 4.4GB</text>
+<text x="384.0" y="187" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">12 fault classes</text>
+<text x="384.0" y="204" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">trains the fault-ID head</text>
+<rect x="696.0" y="122" width="304.0" height="135" rx="10" fill="#14181D" stroke="#232A31" stroke-width="1.5"/>
+<text x="712.0" y="150" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#E7ECEF">Field recordings</text>
+<text x="712.0" y="170" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">Enrol and Check, on-device</text>
+<text x="712.0" y="187" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">the only real machines</text>
+<text x="712.0" y="204" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">healthy and faulty, together</text>
+<line x1="192.0" y1="257" x2="192.0" y2="275" stroke="#232A31" stroke-width="1.5"/>
+<line x1="520.0" y1="257" x2="520.0" y2="275" stroke="#232A31" stroke-width="1.5"/>
+<line x1="848.0" y1="257" x2="848.0" y2="275" stroke="#232A31" stroke-width="1.5"/>
+<line x1="192.0" y1="275" x2="848.0" y2="275" stroke="#232A31" stroke-width="1.5"/>
+<line x1="520" y1="275" x2="520" y2="296" stroke="#E0A64B" stroke-width="2"/>
+<polygon points="514,296 526,296 520,305" fill="#E0A64B"/>
+<text x="24" y="311" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="700" letter-spacing="1" fill="#E0A64B">2. KAGGLE: TRAIN AND EVALUATE</text>
+<rect x="24" y="325" width="992" height="300" rx="14" fill="none" stroke="#232A31" stroke-width="1.5" stroke-dasharray="4 4"/>
+<rect x="40" y="345" width="176" height="130" rx="10" fill="#14181D" stroke="#232A31" stroke-width="1.5"/>
+<text x="56" y="373" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#E7ECEF">Baseline</text>
+<text x="56" y="393" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">Dense autoencoder</text>
+<text x="56" y="410" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">MSE or selective</text>
+<text x="56" y="427" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">Mahalanobis</text>
+<text x="56" y="444" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">the DCASE reference</text>
+<rect x="236" y="345" width="176" height="130" rx="10" fill="#14181D" stroke="#232A31" stroke-width="1.5"/>
+<text x="252" y="373" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#E7ECEF">Frozen embedder</text>
+<text x="252" y="393" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">EfficientAT mn10_as</text>
+<text x="252" y="410" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">or mn04_as</text>
+<text x="252" y="427" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">AudioSet-distilled</text>
+<text x="252" y="444" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">MobileNetV3, to ONNX</text>
+<rect x="432" y="345" width="176" height="130" rx="10" fill="#14181D" stroke="#232A31" stroke-width="1.5"/>
+<text x="448" y="373" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#E7ECEF">Whitening + scorer</text>
+<text x="448" y="393" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">PCA-whiten pooled</text>
+<text x="448" y="410" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">healthy embeddings</text>
+<text x="448" y="427" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">Mahalanobis or kNN</text>
+<rect x="628" y="345" width="176" height="130" rx="10" fill="#14181D" stroke="#232A31" stroke-width="1.5"/>
+<text x="644" y="373" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#E7ECEF">Quantize</text>
+<text x="644" y="393" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">Static QDQ INT8</text>
+<text x="644" y="410" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">per-channel</text>
+<text x="644" y="427" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">MinMax calibration</text>
+<text x="644" y="444" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">on real mels</text>
+<rect x="824" y="345" width="176" height="130" rx="10" fill="#14181D" stroke="#232A31" stroke-width="1.5"/>
+<text x="840" y="373" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#E7ECEF">Fault-ID head</text>
+<text x="840" y="393" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">Supervised, frozen</text>
+<text x="840" y="410" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">embeddings</text>
+<text x="840" y="427" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">source-disjoint split</text>
+<text x="840" y="444" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">secondary mode</text>
+<rect x="40" y="495" width="960" height="100" rx="10" fill="#14181D" stroke="#232A31" stroke-width="1.5"/>
+<text x="56" y="523" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" fill="#5BB98C">Evaluation: official score is the harmonic mean of AUC and pAUC</text>
+<text x="56" y="543" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">Baseline 0.547. mn10_as, whitened, Mahalanobis reaches 0.616. The best matched configuration.</text>
+<text x="56" y="560" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">Every embedder configuration beats the reproduced baseline.</text>
+<line x1="520" y1="625" x2="520" y2="656" stroke="#E0A64B" stroke-width="2"/>
+<polygon points="514,656 526,656 520,665" fill="#E0A64B"/>
+<text x="40" y="680" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="700" letter-spacing="1" fill="#E0A64B" text-anchor="start">3. ARTIFACTS, COMMITTED TO THE REPO</text>
+<rect x="40" y="695" width="222.0" height="100" rx="10" fill="#14181D" stroke="#232A31" stroke-width="1.5"/>
+<text x="56" y="723" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#E7ECEF">ONNX FP32</text>
+<text x="56" y="743" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">11.93 MB</text>
+<text x="56" y="760" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">mn10_as</text>
+<rect x="286.0" y="695" width="222.0" height="100" rx="10" fill="#14181D" stroke="#232A31" stroke-width="1.5"/>
+<text x="302.0" y="723" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#E7ECEF">ONNX INT8</text>
+<text x="302.0" y="743" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">3.55 MB</text>
+<text x="302.0" y="760" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">mn10_as, quantized</text>
+<rect x="532.0" y="695" width="222.0" height="100" rx="10" fill="#14181D" stroke="#232A31" stroke-width="1.5"/>
+<text x="548.0" y="723" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#E7ECEF">Whitener + scorer</text>
+<text x="548.0" y="743" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">params, per machine</text>
+<text x="548.0" y="760" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">fit at enrollment</text>
+<rect x="778.0" y="695" width="222.0" height="100" rx="10" fill="#14181D" stroke="#232A31" stroke-width="1.5"/>
+<text x="794.0" y="723" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#E7ECEF">Fault-ID classes</text>
+<text x="794.0" y="743" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">12 classes</text>
+<text x="794.0" y="760" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">supervised head</text>
+<text x="520" y="817" font-family="Arial, Helvetica, sans-serif" font-size="12.5" font-weight="400" letter-spacing="0" fill="#8A97A0" text-anchor="middle">Shipped into android/app/src/main/assets/</text>
+<line x1="520" y1="830" x2="520" y2="856" stroke="#E0A64B" stroke-width="2"/>
+<polygon points="514,856 526,856 520,865" fill="#E0A64B"/>
+<text x="40" y="880" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="700" letter-spacing="1" fill="#E0A64B" text-anchor="start">4. ON-DEVICE, THE ANDROID APP</text>
+<rect x="40" y="895" width="222.0" height="150" rx="10" fill="#14181D" stroke="#232A31" stroke-width="1.5"/>
+<text x="56" y="923" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#E7ECEF">AudioFeatures.kt</text>
+<text x="56" y="943" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">log-mel, pure Kotlin</text>
+<text x="56" y="960" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">matches the Python</text>
+<text x="56" y="977" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">reference to 2.4e-5</text>
+<rect x="286.0" y="895" width="222.0" height="150" rx="10" fill="#14181D" stroke="#232A31" stroke-width="1.5"/>
+<text x="302.0" y="923" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#E7ECEF">InjiniEmbedder.kt</text>
+<text x="302.0" y="943" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">ONNX Runtime Mobile</text>
+<text x="302.0" y="960" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">INT8</text>
+<text x="302.0" y="977" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">NNAPI, XNNPACK,</text>
+<text x="302.0" y="994" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">or plain CPU</text>
+<rect x="532.0" y="895" width="222.0" height="150" rx="10" fill="#14181D" stroke="#232A31" stroke-width="1.5"/>
+<text x="548.0" y="923" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#E7ECEF">AnomalyScorer.kt</text>
+<text x="548.0" y="943" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">on-device diagonal</text>
+<text x="548.0" y="960" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">Mahalanobis + kNN</text>
+<text x="548.0" y="977" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">per-machine</text>
+<text x="548.0" y="994" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">enrollment</text>
+<rect x="778.0" y="895" width="222.0" height="150" rx="10" fill="#14181D" stroke="#232A31" stroke-width="1.5"/>
+<text x="794.0" y="923" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#E7ECEF">Three-tier verdict</text>
+<text x="794.0" y="943" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">sounds like itself</text>
+<text x="794.0" y="960" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">worth checking</text>
+<text x="794.0" y="977" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">get it looked at</text>
+<line x1="520" y1="1045" x2="520" y2="1071" stroke="#E0A64B" stroke-width="2"/>
+<polygon points="514,1071 526,1071 520,1080" fill="#E0A64B"/>
+<text x="40" y="1095" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="700" letter-spacing="1" fill="#E0A64B" text-anchor="start">5. THE FIELD DATA LOOP</text>
+<rect x="40" y="1110" width="468.0" height="95" rx="10" fill="#14181D" stroke="#232A31" stroke-width="1.5"/>
+<text x="56" y="1138" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#E7ECEF">Enrol</text>
+<text x="56" y="1158" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">Six healthy clips</text>
+<text x="56" y="1175" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">Straight into the corpus,</text>
+<text x="56" y="1192" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">healthy label, automatically</text>
+<rect x="532.0" y="1110" width="468.0" height="95" rx="10" fill="#14181D" stroke="#232A31" stroke-width="1.5"/>
+<text x="548.0" y="1138" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#E7ECEF">Check</text>
+<text x="548.0" y="1158" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">One clip, a three-tier verdict</text>
+<text x="548.0" y="1175" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">Queues for Add verdict,</text>
+<text x="548.0" y="1192" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">the real answer comes later</text>
+<line x1="280" y1="1205" x2="280" y2="1216" stroke="#E0A64B" stroke-width="2"/>
+<polygon points="274,1216 286,1216 280,1225" fill="#E0A64B"/>
+<line x1="760" y1="1205" x2="760" y2="1216" stroke="#E0A64B" stroke-width="2"/>
+<polygon points="754,1216 766,1216 760,1225" fill="#E0A64B"/>
+<rect x="40" y="1235" width="960" height="80" rx="10" fill="#14181D" stroke="#232A31" stroke-width="1.5"/>
+<text x="56" y="1263" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#E7ECEF">DatasetExporter.kt</text>
+<text x="56" y="1283" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">Zips the whole corpus. A live healthy and faulty counter answers whether enough has been collected.</text>
+<line x1="520" y1="1315" x2="520" y2="1321" stroke="#E0A64B" stroke-width="2"/>
+<polygon points="514,1321 526,1321 520,1330" fill="#E0A64B"/>
+<line x1="280" y1="1330" x2="760" y2="1330" stroke="#232A31" stroke-width="1.5"/>
+<line x1="280" y1="1330" x2="280" y2="1350" stroke="#232A31" stroke-width="1.5"/>
+<line x1="760" y1="1330" x2="760" y2="1350" stroke="#232A31" stroke-width="1.5"/>
+<rect x="40" y="1350" width="468.0" height="60" rx="10" fill="#14181D" stroke="#232A31" stroke-width="1.5"/>
+<text x="56" y="1378" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#E7ECEF">Export dataset (.zip)</text>
+<line x1="274.0" y1="1410" x2="274.0" y2="1436" stroke="#E0A64B" stroke-width="2"/>
+<polygon points="268.0,1436 280.0,1436 274.0,1445" fill="#E0A64B"/>
+<rect x="40" y="1445" width="468.0" height="60" rx="10" fill="#14181D" stroke="#232A31" stroke-width="1.5"/>
+<text x="56" y="1473" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#E7ECEF">Android share sheet</text>
+<line x1="274.0" y1="1505" x2="274.0" y2="1531" stroke="#E0A64B" stroke-width="2"/>
+<polygon points="268.0,1531 280.0,1531 274.0,1540" fill="#E0A64B"/>
+<rect x="40" y="1540" width="468.0" height="70" rx="10" fill="#14181D" stroke="#232A31" stroke-width="1.5"/>
+<text x="56" y="1568" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" fill="#E7ECEF">WhatsApp, Drive,</text>
+<text x="56" y="1588" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">or any file manager</text>
+<rect x="532.0" y="1350" width="468.0" height="60" rx="10" fill="#14181D" stroke="#232A31" stroke-width="1.5"/>
+<text x="548.0" y="1378" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#E0A64B">Sync to Injini Cloud</text>
+<line x1="766.0" y1="1410" x2="766.0" y2="1436" stroke="#E0A64B" stroke-width="2"/>
+<polygon points="760.0,1436 772.0,1436 766.0,1445" fill="#E0A64B"/>
+<rect x="532.0" y="1445" width="468.0" height="70" rx="10" fill="#14181D" stroke="#232A31" stroke-width="1.5"/>
+<text x="548.0" y="1473" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#E7ECEF">Injini Relay</text>
+<text x="548.0" y="1493" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">FastAPI, a Hugging Face Space</text>
+<line x1="766.0" y1="1515" x2="766.0" y2="1541" stroke="#E0A64B" stroke-width="2"/>
+<polygon points="760.0,1541 772.0,1541 766.0,1550" fill="#E0A64B"/>
+<rect x="532.0" y="1550" width="468.0" height="70" rx="10" fill="#14181D" stroke="#232A31" stroke-width="1.5"/>
+<text x="548.0" y="1578" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#E7ECEF">Validate, then stage</text>
+<text x="548.0" y="1598" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">as a pull request, never a</text>
+<text x="548.0" y="1615" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">direct write</text>
+<line x1="766.0" y1="1620" x2="766.0" y2="1646" stroke="#E0A64B" stroke-width="2"/>
+<polygon points="760.0,1646 772.0,1646 766.0,1655" fill="#E0A64B"/>
+<rect x="532.0" y="1655" width="468.0" height="60" rx="10" fill="#14181D" stroke="#232A31" stroke-width="1.5"/>
+<text x="548.0" y="1683" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" fill="#E7ECEF">Hugging Face dataset repo</text>
+<text x="40" y="1770" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="700" letter-spacing="1" fill="#E0A64B" text-anchor="start">6. REVIEW, THEN DEPLOY</text>
+<line x1="766.0" y1="1715" x2="766.0" y2="1771" stroke="#E0A64B" stroke-width="2"/>
+<polygon points="760.0,1771 772.0,1771 766.0,1780" fill="#E0A64B"/>
+<rect x="40" y="1785" width="960" height="70" rx="10" fill="#14181D" stroke="#232A31" stroke-width="1.5"/>
+<text x="56" y="1813" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#E7ECEF">Admin dashboard</text>
+<text x="56" y="1833" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">Where the data is coming from, and what it looks like once reviewed.</text>
+<line x1="520" y1="1855" x2="520" y2="1866" stroke="#E0A64B" stroke-width="2"/>
+<polygon points="514,1866 526,1866 520,1875" fill="#E0A64B"/>
+<rect x="40" y="1880" width="960" height="70" rx="10" fill="#14181D" stroke="#232A31" stroke-width="1.5"/>
+<text x="56" y="1908" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#D4694E">A person reviews and merges the pull request</text>
+<text x="56" y="1928" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#8A97A0">Nothing reaches the training branch on its own.</text>
+<text x="40" y="2002" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700" letter-spacing="0" fill="#E0A64B" text-anchor="start">This feeds the next Kaggle retrain.</text>
+<path d="M 40 1980 L 15 1980 L 15 410 L 32 410" fill="none" stroke="#E0A64B" stroke-width="2" stroke-dasharray="6 4"/>
+<polygon points="32,404 32,416 42,410" fill="#E0A64B"/>
+</svg>
