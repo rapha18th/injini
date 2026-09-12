@@ -669,6 +669,85 @@ given fake `HF_TOKEN`/`HF_DATASET_REPO` in this local run) instead of
 crashing. Every guard in `app.py` is now proven against a running server,
 not just read back and assumed correct.
 
+## ADR-20: the relay went live, the upload key was deliberately bundled, and a real 404 turned out to be leftover test data
+
+**Context.** The relay was deployed live and the dataset repo created. The
+user then asked for the low-privilege upload key to be bundled directly
+into the app ("would be difficult to paste in every app we distribute"),
+gave the key value, and asked for a minimalist admin dashboard on the relay
+plus a non-technical sync screen in the app.
+
+**Bundling the key is not the ADR-19 mistake repeated.** ADR-19 rejected a
+bundled Hugging Face **write** token because leaking it hands out real
+write access to the dataset. The upload key is a different class of
+secret by design: the relay's `create_pr=True` means the worst a leaked
+key buys anyone is the ability to open a pull request, never to write
+directly. That is exactly the risk profile a bundled, publicly-visible
+(app + this git history) constant is acceptable for. `HfSync.kt`'s doc
+comment says this explicitly, including that rotating the key means
+updating this constant, not just the relay's secret.
+
+**A real bug, immediately: creating the Space did not create the dataset
+repo it pushes into.** First live test through the bundled key hit `404
+Repository Not Found` for `rairo/injini-field-data` — the Space existed,
+the secrets were configured, but nobody had run `hf repos create` for the
+dataset side. Created it (private) and the same request succeeded
+immediately, landing a real pull request. Lesson for next time: a Docker
+Space talking to a dataset repo needs both repos to exist independently;
+standing up the Space is not suffient on its own.
+
+**A second, much more instructive bug: a "network" failure that was
+actually stale `SharedPreferences`.** After bundling the key, the app's
+own sync button 404'd on-device — but this time `curl` from three
+different IPs, the phone's own browser hitting `/health`, and even the
+same POST issued from a different network all succeeded. Chased this hard
+before finding the real cause: forced http/1.1 (no change), added a
+retry (no change), added an `HttpLoggingInterceptor` to see the *actual*
+request the app sent — and it was going to `https://example-injini-relay.
+hf.space`, a placeholder domain typed in during an earlier manual test of
+the settings screen, still saved in `SharedPreferences` from before that
+screen was replaced with the current bundled-default one-button design.
+`savedRelayUrl()`'s fallback logic (saved value, else the bundled default)
+was working exactly as written — the saved value just happened to be
+garbage left over from testing. `adb shell pm clear com.injini.app` before
+retesting is what actually revealed the fix worked; it also wipes the
+on-device corpus, which is the trade-off of resetting preferences this way,
+not a bug in the app.
+
+**Lesson, generalizable:** when a client-observed failure doesn't reproduce
+from any other client or network, the honest next step is capturing the
+*exact* request the failing client actually sends (a logging interceptor,
+here) before reasoning further about the server or the network — three
+plausible-sounding hypotheses (HTTP/2 negotiation, carrier middlebox, CDN
+edge propagation) were each pursued and disproven by direct testing before
+the real, mundane cause (stale local state from earlier manual testing in
+this same conversation) was found. The logging interceptor was removed
+before shipping — logging an API key to logcat in plaintext is not a
+production-shippable diagnostic, even a low-privilege one.
+
+**Admin dashboard** (`hf_space/templates/dashboard.html`,
+`/dashboard` route in `app.py`, same Basic Auth as the manual upload page):
+lists every field-export pull request (source, status, link) via
+`HfApi.get_repo_discussions()`, and tallies healthy/faulty labels — overall
+and per source — by downloading every merged `manifest.csv` under
+`field_exports/` on `main` via `list_repo_files()` + `hf_hub_download()`.
+Deliberately counts only merged content: a pull request sitting unreviewed
+is not training data yet, and the dashboard should not imply otherwise.
+
+**Mobile side simplified to match**: "Sync to Hugging Face" (a settings
+screen with a relay-URL field, a key field, and a Save button) became
+"Sync to Injini Cloud" (one button, one sentence, no technical terms
+anywhere) — `HfSyncActivity` dropped all input fields entirely, reading the
+bundled/saved values directly. Whoever uses this app should never need to
+know Hugging Face, a relay, or a key exist.
+
+**Verified live, start to finish**: added a real machine, ran a real Enrol
+(6 clips), tapped Sync now, got "Synced. Sent to Injini Cloud." on-device,
+and confirmed via the Hub API that pull request #6 ("Field export from
+samsung_SM-M075F") landed on `rairo/injini-field-data`, open and untouched
+— exactly the review-gated state the design calls for, not auto-merged by
+anything, including this session.
+
 ## Results summary (for context; full table and narrative in Injini.docx §10)
 
 Five DCASE 2025 machine types (bearing, fan, gearbox, slider, valve), CPU,
