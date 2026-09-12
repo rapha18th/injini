@@ -80,7 +80,7 @@
         android:layout_marginTop="10dp"
         android:layerType="software"
         android:background="@drawable/bg_chip"
-        android:text="Sync to Hugging Face  ›"
+        android:text="Sync to Injini Cloud  ›"
         android:textColor="@color/injini_dim"
         android:textSize="13sp"
         android:textAllCaps="false"

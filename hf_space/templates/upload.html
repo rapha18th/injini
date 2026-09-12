@@ -22,6 +22,7 @@
 <body>
   <h1>INJINI RELAY</h1>
   <p class="dim">Manual upload into <strong>{{ repo }}</strong>. Every upload opens a pull request on the dataset — nothing lands on the training branch without a review.</p>
+  <p class="dim" style="margin-top:4px;"><a href="/dashboard">See where the data is coming from &rarr;</a></p>
 
   {% if result %}
   <p class="ok">Uploaded as <code>{{ result.path_in_repo }}</code>.<br><a href="{{ result.pr_url }}" target="_blank" rel="noopener">Open the pull request &rarr;</a></p>

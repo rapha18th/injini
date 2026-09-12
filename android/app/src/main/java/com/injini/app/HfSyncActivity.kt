@@ -3,8 +3,6 @@ package com.injini.app
 import android.os.Build
 import android.os.Bundle
 import android.view.View
-import android.widget.EditText
-import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
@@ -13,33 +11,19 @@ import java.io.File
 import kotlin.concurrent.thread
 
 /**
- * Settings + trigger for [HfSync]: paste the relay's URL and its upload key
- * once, then "Upload now" zips the corpus fresh each time and sends it. See
- * [HfSync] and `hf_space/README.md` for why this goes through a small relay
- * this project runs rather than straight to Hugging Face — the short
- * version is that a phone can't safely carry a real Hugging Face write
- * token, since anyone could pull it back out of the APK.
+ * One button: "Sync now". The relay URL and upload key are bundled in the
+ * app (see [HfSync]'s own doc comment for why that's safe here) — nobody
+ * distributing or using this screen should need to know Hugging Face, a
+ * relay, or a key exist at all. See `hf_space/README.md` for what actually
+ * happens on the other end of this tap.
  */
 class HfSyncActivity : AppCompatActivity() {
-
-    private lateinit var urlInput: EditText
-    private lateinit var keyInput: EditText
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_hf_sync)
         applyInsets()
-
-        urlInput = findViewById(R.id.hfUrlInput)
-        keyInput = findViewById(R.id.hfKeyInput)
-        urlInput.setText(HfSync.savedRelayUrl(this))
-        keyInput.setText(HfSync.savedApiKey(this))
-
-        findViewById<View>(R.id.hfSaveButton).setOnClickListener {
-            HfSync.save(this, urlInput.text.toString(), keyInput.text.toString())
-            Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show()
-        }
-        findViewById<View>(R.id.hfUploadButton).setOnClickListener { uploadNow() }
+        findViewById<View>(R.id.hfUploadButton).setOnClickListener { syncNow() }
     }
 
     private fun applyInsets() {
@@ -52,18 +36,10 @@ class HfSyncActivity : AppCompatActivity() {
         }
     }
 
-    private fun uploadNow() {
-        val relayUrl = urlInput.text.toString().trim()
-        val apiKey = keyInput.text.toString().trim()
-        if (relayUrl.isBlank() || apiKey.isBlank()) {
-            Toast.makeText(this, "Enter both the relay URL and the upload key first.", Toast.LENGTH_LONG).show()
-            return
-        }
-        HfSync.save(this, relayUrl, apiKey)
-
+    private fun syncNow() {
         val progress = AlertDialog.Builder(this)
-            .setTitle("Uploading")
-            .setMessage("Zipping the corpus and sending it to the relay…")
+            .setTitle("Syncing")
+            .setMessage("Sending this phone's recordings to Injini Cloud…")
             .setCancelable(false)
             .create()
         progress.show()
@@ -74,12 +50,12 @@ class HfSyncActivity : AppCompatActivity() {
             var zip: File? = null
             try {
                 zip = DatasetExporter.zipToCache(this)
-                val response = HfSync.upload(zip, relayUrl, apiKey, deviceLabel)
+                HfSync.upload(zip, HfSync.savedRelayUrl(this), HfSync.savedApiKey(this), deviceLabel)
                 runOnUiThread {
                     progress.dismiss()
                     AlertDialog.Builder(this)
-                        .setTitle("Uploaded")
-                        .setMessage(response)
+                        .setTitle("Synced")
+                        .setMessage("Sent to Injini Cloud. Thanks for the data.")
                         .setPositiveButton("OK", null)
                         .show()
                 }
@@ -87,8 +63,8 @@ class HfSyncActivity : AppCompatActivity() {
                 runOnUiThread {
                     progress.dismiss()
                     AlertDialog.Builder(this)
-                        .setTitle("Upload failed")
-                        .setMessage(e.message ?: "Unknown error")
+                        .setTitle("Couldn't sync")
+                        .setMessage("Check the connection and try again.\n\n${e.message ?: ""}")
                         .setPositiveButton("OK", null)
                         .show()
                 }

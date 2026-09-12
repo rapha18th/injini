@@ -34,7 +34,7 @@
         <activity
             android:name=".HfSyncActivity"
             android:exported="false"
-            android:label="Sync to Hugging Face" />
+            android:label="Sync to Injini Cloud" />
 
         <!-- Only exercised pre-Android 10, for sharing the exported dataset
              zip from its legacy public-Downloads path — see DatasetExporter. -->

@@ -11,6 +11,7 @@ until a person reviews and merges it. See README.md for the full rationale
 and the required Space secrets.
 """
 
+import csv
 import os
 import re
 import secrets
@@ -22,7 +23,7 @@ from fastapi import Depends, FastAPI, File, Form, HTTPException, Header, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.templating import Jinja2Templates
-from huggingface_hub import HfApi
+from huggingface_hub import HfApi, hf_hub_download
 from huggingface_hub.utils import HfHubHTTPError
 
 HF_TOKEN = os.environ["HF_TOKEN"]
@@ -113,6 +114,73 @@ async def api_upload(
     data = await file.read()
     result = handle_upload(data, file.filename or "upload.zip", source)
     return JSONResponse(result)
+
+
+def _uploads_summary() -> list[dict]:
+    """Where the data is coming from: every field-export PR, newest first — merged, still-pending, or closed."""
+    uploads = []
+    for d in api.get_repo_discussions(HF_DATASET_REPO, repo_type="dataset", discussion_type="pull_request"):
+        uploads.append({
+            "source": d.title.replace("Field export from ", "", 1),
+            "status": d.status,
+            "created_at": d.created_at.strftime("%Y-%m-%d %H:%M UTC"),
+            "url": f"https://huggingface.co/datasets/{HF_DATASET_REPO}/discussions/{d.num}",
+        })
+    uploads.sort(key=lambda u: u["created_at"], reverse=True)
+    return uploads
+
+
+def _data_health() -> dict:
+    """What the merged data actually looks like: healthy vs. faulty, per label, per source. Only counts what's been reviewed onto main — a pending PR isn't training data yet."""
+    by_label: dict[str, int] = {}
+    by_source: dict[str, dict[str, int]] = {}
+    try:
+        manifest_paths = [p for p in api.list_repo_files(HF_DATASET_REPO, repo_type="dataset") if p.endswith("manifest.csv")]
+    except Exception:
+        manifest_paths = []
+
+    for path in manifest_paths:
+        try:
+            local_path = hf_hub_download(HF_DATASET_REPO, path, repo_type="dataset", token=HF_TOKEN)
+        except Exception:
+            continue
+        parts = path.split("/")
+        source = parts[1] if len(parts) > 2 and parts[0] == "field_exports" else "unknown"
+        bucket = by_source.setdefault(source, {"healthy": 0, "faulty": 0})
+        try:
+            with open(local_path, newline="", encoding="utf-8") as f:
+                for row in csv.DictReader(f):
+                    label = (row.get("label") or "").strip()
+                    if not label:
+                        continue
+                    by_label[label] = by_label.get(label, 0) + 1
+                    bucket["healthy" if label == "Normal" else "faulty"] += 1
+        except Exception:
+            continue
+
+    healthy = by_label.get("Normal", 0)
+    total = sum(by_label.values())
+    return {
+        "healthy": healthy,
+        "faulty": total - healthy,
+        "total": total,
+        "by_label": sorted(by_label.items(), key=lambda kv: -kv[1]),
+        "by_source": sorted(by_source.items()),
+    }
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+def dashboard(request: Request, _auth: None = Depends(check_basic_auth)):
+    health = _data_health()
+    return templates.TemplateResponse(
+        request,
+        "dashboard.html",
+        {
+            "repo": HF_DATASET_REPO,
+            "uploads": _uploads_summary()[:40],
+            **health,
+        },
+    )
 
 
 @app.get("/", response_class=HTMLResponse)

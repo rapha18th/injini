@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Injini Relay — Dashboard</title>
+<style>
+  body { background:#0B0E11; color:#E7ECEF; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; max-width: 720px; margin: 48px auto; padding: 0 20px; }
+  h1 { font-size: 20px; letter-spacing: 0.05em; margin-bottom: 4px; }
+  p.dim { color:#8A97A0; font-size: 13px; line-height: 1.5; }
+  a { color:#E0A64B; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .nav { margin-top: 10px; font-size: 13px; }
+  .cards { display:flex; gap: 12px; margin-top: 24px; flex-wrap: wrap; }
+  .card { flex: 1; min-width: 140px; background:#14181D; border:1px solid #232A31; border-radius:14px; padding:16px 18px; }
+  .card .n { font-size: 28px; font-weight: bold; }
+  .card .l { font-size: 12px; color:#8A97A0; margin-top: 4px; }
+  .healthy .n { color:#5BB98C; }
+  .faulty .n { color:#D4694E; }
+  h2 { font-size: 15px; margin-top: 36px; margin-bottom: 10px; color:#E7ECEF; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #232A31; }
+  th { color:#8A97A0; font-weight: normal; }
+  .status-open { color:#E0A64B; }
+  .status-merged { color:#5BB98C; }
+  .status-closed { color:#8A97A0; }
+  .empty { color:#8A97A0; font-size: 13px; padding: 16px 0; }
+  .bar-row { display:flex; align-items:center; gap:10px; margin-bottom:6px; font-size:13px; }
+  .bar-label { width: 160px; flex-shrink:0; }
+  .bar-track { flex:1; background:#14181D; border:1px solid #232A31; border-radius:6px; height:14px; overflow:hidden; }
+  .bar-fill { background:#E0A64B; height:100%; }
+  .bar-count { width: 40px; text-align:right; color:#8A97A0; }
+</style>
+</head>
+<body>
+  <h1>INJINI RELAY — DASHBOARD</h1>
+  <p class="dim">What's landed in <strong>{{ repo }}</strong>, and where it came from. Only merged pull requests count toward the numbers below — a pending upload isn't training data yet.</p>
+  <div class="nav"><a href="/">Manual upload &rarr;</a></div>
+
+  <div class="cards">
+    <div class="card healthy"><div class="n">{{ healthy }}</div><div class="l">healthy clips (merged)</div></div>
+    <div class="card faulty"><div class="n">{{ faulty }}</div><div class="l">faulty clips (merged)</div></div>
+    <div class="card"><div class="n">{{ total }}</div><div class="l">total merged clips</div></div>
+  </div>
+
+  <h2>By label</h2>
+  {% if by_label %}
+  {% set max_count = by_label[0][1] %}
+  {% for label, count in by_label %}
+  <div class="bar-row">
+    <div class="bar-label">{{ label }}</div>
+    <div class="bar-track"><div class="bar-fill" style="width: {{ (count / max_count * 100) | round(1) }}%"></div></div>
+    <div class="bar-count">{{ count }}</div>
+  </div>
+  {% endfor %}
+  {% else %}
+  <div class="empty">No merged data yet. Merge a pull request below to see it here.</div>
+  {% endif %}
+
+  <h2>By source</h2>
+  {% if by_source %}
+  <table>
+    <tr><th>Source</th><th>Healthy</th><th>Faulty</th></tr>
+    {% for source, counts in by_source %}
+    <tr><td>{{ source }}</td><td>{{ counts.healthy }}</td><td>{{ counts.faulty }}</td></tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <div class="empty">Nothing merged yet.</div>
+  {% endif %}
+
+  <h2>Recent uploads</h2>
+  {% if uploads %}
+  <table>
+    <tr><th>Source</th><th>When</th><th>Status</th><th></th></tr>
+    {% for u in uploads %}
+    <tr>
+      <td>{{ u.source }}</td>
+      <td>{{ u.created_at }}</td>
+      <td class="status-{{ u.status }}">{{ u.status }}</td>
+      <td><a href="{{ u.url }}" target="_blank" rel="noopener">view &rarr;</a></td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <div class="empty">No uploads yet.</div>
+  {% endif %}
+</body>
+</html>
