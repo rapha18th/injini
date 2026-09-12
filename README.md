@@ -1,6 +1,11 @@
 # Injini
 
+[![Download the APK](https://img.shields.io/badge/download-Injini%20APK-BE7C1F?style=for-the-badge)](https://github.com/rapha18th/injini/releases/latest/download/app-debug.apk)
+[![Latest release](https://img.shields.io/github/v/release/rapha18th/injini?style=for-the-badge&label=latest&color=1B2A4A)](https://github.com/rapha18th/injini/releases/latest)
+
 Offline acoustic condition monitoring for engines and diesel generators. Built for a mid-range Android phone in Zimbabwe and South Africa. Sibling of [SiloSense](https://github.com/rapha18th/SiloSense).
+
+The link above always points at the current release. Download it straight to a phone, allow installs from the browser or file manager when asked, and install. Debug-signed, no Play Store yet, this is a field-pilot build.
 
 A phone can listen to a machine the way a mechanic does. Injini learns the sound of one machine when it runs well. It flags the sound when something changes. No cloud connection required. No specialist hardware.
 
@@ -67,6 +72,8 @@ Supervised fault-ID head (secondary mode): **0.362 macro F1** across 12 classes,
 Every embedder configuration beats the reproduced baseline. `mn10_as` with kNN edges past the PaSST reference with the same scorer, 0.613 versus 0.596. PaSST ran capped to CPU and five machine types, so treat this as directional. The comparison itself is fair and matched. Full narrative and the whitening ablation in `Injini.docx` Section 10.
 
 ## Android
+
+The [latest release](https://github.com/rapha18th/injini/releases/latest) has a ready-built APK. Building from source instead:
 
 ```bash
 cp models/injini_mn10_as_int8.onnx models/injini_mn10_as_fp32.onnx android/app/src/main/assets/
