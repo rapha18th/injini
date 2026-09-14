@@ -3,15 +3,17 @@
 [![Download the APK](https://img.shields.io/badge/download-Injini%20APK-BE7C1F?style=for-the-badge)](https://github.com/rapha18th/injini/releases/latest/download/app-debug.apk)
 [![Latest release](https://img.shields.io/github/v/release/rapha18th/injini?style=for-the-badge&label=latest&color=1B2A4A)](https://github.com/rapha18th/injini/releases/latest)
 
-Offline acoustic condition monitoring for engines and diesel generators. Built for a mid-range Android phone in Zimbabwe and South Africa. Sibling of [SiloSense](https://github.com/rapha18th/SiloSense).
+Offline acoustic condition monitoring for engines and diesel generators. A phone listens to a machine the way a mechanic does. It learns the sound of that machine when it runs well, and flags the sound when something changes. No cloud connection required. No specialist hardware. No fault-labeled training data needed to get started.
 
 The link above always points at the current release. Download it straight to a phone, allow installs from the browser or file manager when asked, and install. Debug-signed, no Play Store yet, this is a field-pilot build.
 
-A phone can listen to a machine the way a mechanic does. Injini learns the sound of one machine when it runs well. It flags the sound when something changes. No cloud connection required. No specialist hardware.
+## The idea
 
-Injini ships the DCASE Task 2 first-shot recipe, compressed for an Arm phone. A frozen AudioSet-distilled MobileNetV3 embedder (EfficientAT), quantised to INT8. A distance score against the healthy recordings of one specific machine. The neural work is the embedding. The decision is a few lines of linear algebra on the CPU.
+Anomalous sound detection has a real 2026 state of the art, and it does not require a fault-labeled dataset for every machine it monitors. A model pretrained on general audio (AudioSet) already carries most of the structure needed to tell a healthy mechanical sound from a strange one. Freeze that model, embed a handful of healthy recordings from one specific machine, and measure how far a new recording sits from that small healthy cluster. The distance is the anomaly score.
 
-See `Injini.docx` in the Sensing Work set for the full argument, the history, the Arm rationale, and the living evaluation table.
+Injini ships that recipe, compressed to run entirely on an Arm phone: a frozen AudioSet-distilled MobileNetV3 embedder (EfficientAT), quantised to INT8, scored against a per-machine healthy fingerprint with a whitened distance metric. The neural work is the embedding. The decision is a few lines of linear algebra on the CPU.
+
+The deeper goal is to benchmark that baseline honestly in the field, not just in a lab. Every recording a phone takes gets an eventual real-world verdict, healthy confirmed or an actual fault, once someone has looked at the machine. Comparing the model's on-device guess against that verdict, at scale, across real machines in real conditions, does two things at once: it stress-tests today's baseline outside a curated benchmark, and it builds exactly the labeled dataset a better model would need next.
 
 ## Architecture
 
@@ -29,9 +31,13 @@ Data to deployment, end to end.
 | Score | Per-machine enrollment → Mahalanobis (full-cov in eval, diagonal + kNN on device) | `src/anomaly.py`, `AnomalyScorer.kt` |
 | Fault ID | Optional supervised head on frozen embeddings, source-disjoint split | `src/faultid.py` |
 
+## Why whitening matters
+
+A raw, unwhitened distance in embedding space sits at baseline. The dimensions of a frozen embedding carry wildly different variance, and an ordinary distance metric lets the noisiest dimensions dominate the score regardless of what actually changed acoustically. Whitening the embedding space, scaling each dimension by its own variance under the healthy population, before measuring distance is what turns a frozen embedder into a working anomaly detector. This was verified with a direct ablation, not assumed.
+
 ## Evaluation
 
-Every claim is anchored to a published DCASE figure. Data comes from the public HuggingFace mirror `HTill/dcase2025_task2_dev` by default (`--source hf`). Zenodo has been unreliable. See [ADR-4](ADR.md#adr-4-kaggle-specific-data-source-has-to-be-resilient-not-clever).
+Every claim here is anchored to a published DCASE figure. Data comes from the public HuggingFace mirror `HTill/dcase2025_task2_dev` by default.
 
 ```bash
 pip install -r requirements.txt
@@ -53,9 +59,9 @@ python export/quantize.py  --fp32 models/injini_mn10_as_fp32.onnx --calib-dir da
 python src/eval_dcase.py   --backend onnx:models/injini_mn10_as_int8.onnx --scorer knn
 ```
 
-`notebooks/injini_train.ipynb` runs the whole sequence on Kaggle. It is self-contained. No private dataset. No repo of ours to clone. See [ADR-4](ADR.md#adr-4-kaggle-specific-data-source-has-to-be-resilient-not-clever). `notebooks/injini_faultid_only.ipynb` reruns just the supervised head.
+`notebooks/injini_train.ipynb` runs the whole sequence on Kaggle and is fully self-contained: no private dataset, nothing to clone beyond the public EfficientAT repository. `notebooks/injini_faultid_only.ipynb` reruns just the supervised head.
 
-### Results, 2026-09-11 (Kaggle, CPU, five DCASE machine types)
+### Results (Kaggle, CPU, five DCASE machine types)
 
 | System | Official score | Mean AUC |
 |---|---|---|
@@ -67,42 +73,11 @@ python src/eval_dcase.py   --backend onnx:models/injini_mn10_as_int8.onnx --scor
 | mn04_as, whitened, kNN | 0.593 | 0.630 |
 | mn04_as, whitened, kNN, INT8 | 0.602 | 0.644 |
 
-Supervised fault-ID head (secondary mode): **0.362 macro F1** across 12 classes, source-disjoint split, mn10_as embeddings. The clean-data ceiling sits around 98 to 99%. A source-disjoint split of a messy, unlicensed-provenance public corpus earns a lower number honestly. See [ADR-10](ADR.md#adr-10-a-shared-kaggle-input-mount-can-silently-contaminate-a-recursive-glob) for a contamination bug this caught before it reached the paper.
+Every embedder configuration beats the reproduced baseline. `mn10_as` with kNN edges past the PaSST transformer reference under the same scorer, 0.613 against 0.596. PaSST ran capped to CPU and to the same five machine types, so this comparison is directional rather than a definitive verdict on either architecture, but it is fair and matched.
 
-Every embedder configuration beats the reproduced baseline. `mn10_as` with kNN edges past the PaSST reference with the same scorer, 0.613 versus 0.596. PaSST ran capped to CPU and five machine types, so treat this as directional. The comparison itself is fair and matched. Full narrative and the whitening ablation in `Injini.docx` Section 10.
+Supervised fault-ID head (secondary mode): **0.362 macro F1** across 12 classes, source-disjoint split, mn10_as embeddings. A clean, randomly split dataset can reach a ceiling near 98 to 99%. A source-disjoint split of a messy, mixed-provenance public corpus earns a lower number honestly, and that honesty is the point of reporting it.
 
-## Android
-
-The [latest release](https://github.com/rapha18th/injini/releases/latest) has a ready-built APK. Building from source instead:
-
-```bash
-cp models/injini_mn10_as_int8.onnx models/injini_mn10_as_fp32.onnx android/app/src/main/assets/
-cd android && ./gradlew assembleDebug
-adb install -r app/build/outputs/apk/debug/app-debug.apk
-```
-
-Every machine gets its own fingerprint. The home screen carries a dropdown, "Select or add a machine." Tap it for every known machine, plus "+ Add new machine." Picking one shows an inline card right there: engine type, category, enrolled state, check count, training clip count. A separate, always-visible **Machines** button opens the full fleet screen for management: add, delete, review any machine's queue in one place. "+ Add machine" collects a name, engine type (Petrol, Diesel, Not sure) and category (Vehicle, Generator, Pump, Other). A rod knock on a diesel generator and the same fault on a petrol kombi are different training examples. `MachineRegistry.kt` persists it in one JSON file, the same shape as TapSense's vessel registry.
-
-Two flows run against whichever machine is selected. Both feed the training corpus automatically.
-
-- **Enrol** records six healthy ten-second clips and builds that machine's fingerprint. Every one of those clips writes straight into the corpus under the healthy label. A clip recorded during enrolment is healthy by definition.
-- **Check** records one clip and returns a three-tier verdict, then queues that same clip with the model's tier as a hint. The real answer usually arrives hours or days later, once a mechanic has actually looked. A visible **Add verdict** button appears, on the home screen and on that machine's row in the fleet list, the moment a machine has a recording waiting. Tapping it lists each queued recording. Picking one opens the label dialog: healthy confirmed, or faulty against the fault-ID head's own class list, free text for a fault the taxonomy has no name for yet. Confirming moves the file out of the pending queue into its real corpus folder, with a manifest row shaped the way `prepare_engine_sounds.py` already expects. This is the field data-collection tool the working paper's Section 09 once imagined as separate software. It lives inside these same two flows instead.
-
-Every recording, Enrol or Check, drives a genuinely live waveform and a counting-down status line. A continuous travelling ripple and a breathing REC dot run the whole ten seconds, even in a silent room. The screen never looks frozen. The "Full model results" dialog shows the matched FP32-vs-INT8 embedder benchmark, the execution-provider trace, and a field benchmark of the on-device model itself. The custom adaptive icon is a five-bar amber waveform on the app's own instrument-panel dark ground.
-
-Injini benchmarks itself in the field. Every Check clip's on-device tier gets compared against the verdict it eventually receives. A false positive means the model flagged something that turned out healthy. A false negative means the model read something as healthy that turned out faulty. Both get surfaced immediately and written into `manifest.csv`'s `benchmark_outcome` column. A false negative also flags that machine as needing re-enrollment, since its healthy fingerprint may include a bad sample. The flag clears automatically the next time the machine is enrolled. Fleet-wide totals sit in "Full model results."
-
-Dataset export and remote sync both live on the Machines screen. A live counter reads "Dataset: N healthy, M faulty, T total," tap for the per-fault-type breakdown. It answers whether enough has been collected, without guessing. **Export dataset (.zip)** zips the whole corpus, confirmed clips and the still-pending queue together, and hands it straight to Android's share sheet. WhatsApp, Gmail, Drive, or any file manager through the public Downloads folder all work the same way. **Sync to Injini Cloud** is one button and one sentence. No technical terms appear anywhere in it.
-
-Behind that button, the zip travels through **Injini Relay**, a small backend deployed as a Hugging Face Space. It never goes straight to Hugging Face. The relay is the only thing that holds a real Hugging Face write token. The relay's URL and a separate, low-privilege upload key are bundled into the app itself. Pasting a key into every phone this gets distributed to is not workable in the field, so the key is designed to be safe to distribute this way. If it leaks, the most it allows is opening a pull request against the dataset. The relay always stages uploads as a pull request for a human to review, so a direct write stays out of reach either way. Every sync is one deliberate tap. The app stays offline otherwise. The relay also carries a minimal admin dashboard, at `/dashboard`, behind the same login as its manual-upload page. It shows where the data is coming from and what it looks like once reviewed. See [ADR-18](ADR.md#adr-18-dataset-export-a-live-label-counter-and-hugging-face-as-the-sync-target), [ADR-19](ADR.md#adr-19-adr-18s-direct-to-hf-sync-was-corrected--a-phone-cant-safely-hold-a-write-token) and [ADR-20](ADR.md#adr-20-the-relay-went-live-the-upload-key-was-deliberately-bundled-and-a-real-404-turned-out-to-be-leftover-test-data) for the full reasoning. `hf_space/README.md` has the deploy steps.
-
-Feature parity (Kotlin vs the Python reference):
-
-```bash
-cd android && ./gradlew testDebugUnitTest --tests "com.injini.app.AudioFeaturesParityTest"
-```
-
-### On-device, 2026-09-11 (Samsung SM-M075F, in place of the M16 originally planned)
+### On-device
 
 | Measurement | INT8 | FP32 |
 |---|---|---|
@@ -110,33 +85,38 @@ cd android && ./gradlew testDebugUnitTest --tests "com.injini.app.AudioFeaturesP
 | Load time | 241.7 ms | 87.1 ms |
 | Executed per node | CPUExecutionProvider: all 3670 nodes | same |
 
-XNNPACK registered on this device but ran nothing. SiloSense's Galaxy M16 ran the same workload entirely through XNNPACK. Process memory sits at 178.2 MB PSS, thermal status LIGHT. See [ADR-12](ADR.md#adr-12-a-verdict-shown-and-immediately-overwritten-by-the-idle-reset) and [ADR-13](ADR.md#adr-13-the-results-link-sat-underneath-the-system-navigation-bar) for two real bugs the first on-device run caught, and the note on unvalidated 6-clip on-device calibration in [Open items](ADR.md#open-items).
-
-## Local artefacts measured so far
+Measured on a mid-range Android phone. Process memory sits at 178.2 MB PSS, thermal status LIGHT.
 
 | Embedder | Params (extractor) | ONNX FP32 | ONNX INT8 |
 |---|---|---|---|
 | `mn10_as` | 2.97 M | 11.93 MB | 3.55 MB |
 | `mn04_as` | 0.52 M | 2.14 MB | 0.93 MB |
 
-AUC numbers on DCASE come from the Kaggle run and land in `Injini.docx` Section 10.
+## Android: turning deployment into a dataset
 
-## Known issues and gotchas
+Every machine gets its own fingerprint. **Enrol** records six healthy ten-second clips and builds that fingerprint; every one of those clips also joins the training corpus under the healthy label, since a clip recorded during enrolment is healthy by definition. **Check** records one clip, returns an instant three-tier read against the fingerprint, and queues that same clip for a real answer. The model's guess is not the label. The label comes later, from **Add verdict**, once someone has actually looked at the machine: healthy confirmed, or the real fault.
 
-The short version follows. The full incident log with context and fixes lives in [ADR.md](ADR.md).
+That verdict closes the loop. Every Check gets compared automatically against its eventual outcome, so the app carries a running field benchmark of its own model, not just a growing pile of recordings. A verdict that contradicts a healthy fingerprint flags that machine for re-enrollment, since the fingerprint itself may have been built on a bad sample. The whole recording corpus, including the still-pending queue, can be exported as a zip at any point, or synced to a shared store for retraining. See `hf_space/` for the sync backend.
 
-- **A brand-new private Kaggle dataset does not reliably mount into a kernel started right after creation**, even when it shows `status: ready`. The notebook is now fully self-contained. It writes its own code, clones public EfficientAT, and reads a public HF mirror, rather than depending on a dataset of ours.
-- **Zenodo was down for an extended period**, a 504 on both the pretty URL and the bare REST API. The DCASE dev set now comes from a public HuggingFace mirror instead.
-- **That HF mirror is incomplete**. It holds 5 of the 7 official DCASE 2025 machine types. ToyCar and ToyTrain are missing. Every result here covers bearing, fan, gearbox, slider, and valve.
-- **A Kaggle public dataset does not always mount at `/kaggle/input/<slug>`.** `zeyadzsm/engine-sounds` mounted at `/kaggle/input/datasets`, a shared folder. Scan `/kaggle/input/*` for the directory that actually holds your files. Never hardcode the path.
-- **Kaggle's current GPU image (`torch 2.10+cu128`) dropped Tesla P100 support.** `torch.cuda.is_available()` still returns `True`. The failure only appears on the first real kernel launch. Everything here defaults to CPU.
-- **A hand-rolled partial-AUC metric returned `p/2` for a random scorer instead of 0.5.** It crushed every score on the first real run and looked like total failure. The fix matches `sklearn.metrics.roc_auc_score(max_fpr=p)` exactly. Validate any hand-rolled metric against a reference on synthetic data before trusting it on real results.
-- **A raw, unwhitened Mahalanobis distance on a frozen embedding sits at baseline level.** Whitening plus per-machine score normalisation earns the lift over baseline. A direct ablation confirmed this. It was verified, not assumed.
-- **Materialising every clip's log-mel for a large split before batching kills the process with an out-of-memory error and no traceback.** It works fine at around 1000 clips per split, the DCASE evaluation size. It fails at 20,000, the fault-ID corpus size. Embedding now streams in fixed-size chunks.
-- **`kaggle kernels output` downloads your entire `/kaggle/working` tree.** Keep the working directory in `/tmp` and copy only the deliverables out at the end. Otherwise the output pull never finishes.
-- **`android:path` is not the vector-drawable path attribute.** Every icon in the app rendered as a blank shape until this was caught. Background chips showed. Foreground content did not. The real attribute is `android:pathData`. `android:path` compiles without error, since it is a legitimate but unrelated framework attribute. It simply draws nothing. See [ADR-17](ADR.md#adr-17-field-benchmark-tracking-minimalist-icons-and-a-real-vector-drawable-bug).
-- **Standing up a Hugging Face Space does not create the dataset repo it pushes into.** The relay went live and 404'd on its first real upload, since `rairo/injini-field-data` did not exist yet. The two repos need creating independently.
-- **A stale value in `SharedPreferences` can look exactly like a network bug.** A placeholder URL typed in during an earlier manual test silently overrode a newly bundled default, and the resulting 404 survived forcing http/1.1, adding a retry, and testing from three different IPs before a request logger revealed the actual URL being called. See [ADR-20](ADR.md#adr-20-the-relay-went-live-the-upload-key-was-deliberately-bundled-and-a-real-404-turned-out-to-be-leftover-test-data).
+Build from source:
+
+```bash
+cp models/injini_mn10_as_int8.onnx models/injini_mn10_as_fp32.onnx android/app/src/main/assets/
+cd android && ./gradlew assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+Feature parity between the Kotlin and Python feature pipelines:
+
+```bash
+cd android && ./gradlew testDebugUnitTest --tests "com.injini.app.AudioFeaturesParityTest"
+```
+
+## Limitations
+
+- The public HuggingFace mirror used for evaluation holds 5 of the 7 official DCASE 2025 machine types. ToyCar and ToyTrain are missing. Every result here covers bearing, fan, gearbox, slider, and valve.
+- The fault-ID head's 0.362 macro F1 reflects a source-disjoint split of a messy, mixed-provenance public corpus, not a ceiling on the method itself.
+- On-device calibration with only six enrollment clips across a 960-dimensional embedding is a real, unresolved gap. A near-zero-variance dimension in that small a sample can dominate the whitened distance, and the DCASE evaluation's full-covariance estimate, run on hundreds of clips, does not validate this diagonal, six-clip approximation. A shrinkage estimator (Ledoit-Wolf) over the enrollment covariance is the direct fix, and is the next thing this recipe needs.
 
 ## Licences
 
