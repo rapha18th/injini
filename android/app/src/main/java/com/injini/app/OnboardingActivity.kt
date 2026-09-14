@@ -19,6 +19,7 @@ class OnboardingActivity : AppCompatActivity() {
     companion object {
         private const val PREFS = "injini"
         private const val KEY_SEEN = "onboarding_seen"
+        private const val APK_URL = "https://github.com/rapha18th/injini/releases/latest/download/app-debug.apk"
 
         fun markSeen(context: Context) {
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_SEEN, true).apply()
@@ -39,6 +40,13 @@ class OnboardingActivity : AppCompatActivity() {
         findViewById<View>(R.id.onboardingDoneButton).setOnClickListener {
             markSeen(this)
             finish()
+        }
+        findViewById<View>(R.id.onboardingShareLink).setOnClickListener {
+            val send = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, "Injini, offline acoustic engine monitoring: $APK_URL")
+            }
+            startActivity(Intent.createChooser(send, "Share Injini"))
         }
     }
 

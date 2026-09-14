@@ -114,6 +114,20 @@
                 android:textSize="13sp"
                 android:lineSpacingMultiplier="1.35" />
 
+            <TextView
+                android:id="@+id/onboardingShareLink"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:background="@drawable/bg_chip"
+                android:paddingHorizontal="16dp"
+                android:paddingVertical="12dp"
+                android:text="Know someone who should have this app? Send them the direct link:\ngithub.com/rapha18th/injini/releases/latest/download/app-debug.apk"
+                android:textColor="@color/injini_amber"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:lineSpacingMultiplier="1.3" />
+
         </LinearLayout>
     </ScrollView>
 
