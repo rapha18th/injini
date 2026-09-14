@@ -98,6 +98,8 @@ Every machine gets its own fingerprint. **Enrol** records six healthy ten-second
 
 That verdict closes the loop. Every Check gets compared automatically against its eventual outcome, so the app carries a running field benchmark of its own model, not just a growing pile of recordings. A verdict that contradicts a healthy fingerprint flags that machine for re-enrollment, since the fingerprint itself may have been built on a bad sample. The whole recording corpus, including the still-pending queue, can be exported as a zip at any point, or synced to a shared store for retraining. See `hf_space/` for the sync backend.
 
+A one-page printable guide for anyone recording machines in the field is in [`docs/onboarding`](docs/onboarding/Injini_Recording_Machines.pdf).
+
 Build from source:
 
 ```bash
