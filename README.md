@@ -3,7 +3,7 @@
 [![Download the APK](https://img.shields.io/badge/download-Injini%20APK-BE7C1F?style=for-the-badge)](https://github.com/rapha18th/injini/releases/latest/download/app-debug.apk)
 [![Latest release](https://img.shields.io/github/v/release/rapha18th/injini?style=for-the-badge&label=latest&color=1B2A4A)](https://github.com/rapha18th/injini/releases/latest)
 
-Offline acoustic condition monitoring for engines and diesel generators. A phone listens to a machine the way a mechanic does. It learns the sound of that machine when it runs well, and flags the sound when something changes. No cloud connection required. No specialist hardware. No fault-labeled training data needed to get started.
+Offline acoustic condition monitoring for engines and diesel generators, built for a mid-range Android phone in Zimbabwe and South Africa. Sibling of [SiloSense](https://github.com/rapha18th/SiloSense). A phone listens to a machine the way a mechanic does. It learns the sound of that machine when it runs well, and flags the sound when something changes. No cloud connection required. No specialist hardware. No fault-labeled training data needed to get started.
 
 The link above always points at the current release. Download it straight to a phone, allow installs from the browser or file manager when asked, and install. Debug-signed, no Play Store yet, this is a field-pilot build.
 
