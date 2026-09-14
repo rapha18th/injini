@@ -26,8 +26,18 @@ class AudioCapture {
 
     data class Recording(val pcm: FloatArray, val sampleRate: Int, val source: Source)
 
+    /** Thrown out of [record] when [cancel] is called mid-recording — a deliberate stop, not a failure. */
+    class Cancelled : Exception("recording cancelled")
+
     companion object {
         const val SAMPLE_RATE = 16_000
+    }
+
+    @Volatile private var cancelRequested = false
+
+    /** Asks the recording in progress, if any, to stop at the next chunk boundary. */
+    fun cancel() {
+        cancelRequested = true
     }
 
     /**
@@ -36,8 +46,11 @@ class AudioCapture {
      * level (0..1, silence to clipping) and the elapsed fraction (0..1) of the
      * requested duration — a UI can use these to drive a live waveform and a
      * countdown instead of a status line that sits frozen for the whole clip.
+     *
+     * Throws [Cancelled] if [cancel] is called before the clip finishes.
      */
     fun record(seconds: Double, onProgress: ((level: Float, elapsedFraction: Float) -> Unit)? = null): Recording {
+        cancelRequested = false
         val (record, source) = open()
         val total = (SAMPLE_RATE * seconds).toInt()
         val out = FloatArray(total)
@@ -46,6 +59,7 @@ class AudioCapture {
         var written = 0
         try {
             while (written < total) {
+                if (cancelRequested) throw Cancelled()
                 val n = record.read(buf, 0, buf.size)
                 if (n <= 0) break
                 val sb = ByteBuffer.wrap(buf, 0, n).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()

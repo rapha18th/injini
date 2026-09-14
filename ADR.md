@@ -748,6 +748,60 @@ samsung_SM-M075F") landed on `rairo/injini-field-data`, open and untouched
 — exactly the review-gated state the design calls for, not auto-merged by
 anything, including this session.
 
+## ADR-21: recording can be interrupted, both flows ask before they start, and full model results explains its own delay
+
+**Context.** Three field-tested rough edges, reported together: "Full model
+results" felt stuck before its dialog finally appeared, Enrol and Check both
+started the moment their button was tapped with no way back out, and there
+was no onboarding material grounded in what the app actually does.
+
+**"Full model results" was never actually stuck, just silent.** Its first
+tap on a cold run does real work with no earlier feedback: 5 warm-up embeds
+plus a full execution-provider trace (parsing a JSON profile of all 3670
+nodes), a 20-run INT8 benchmark, loading a second FP32 copy of the model
+from scratch, and a 20-run FP32 benchmark on top of that — several real
+seconds with the screen giving no sign anything was happening. `showResults()`
+now drives the same progress-dialog pattern `HfSyncActivity` already used
+for sync, naming the stage in progress ("Tracing execution providers…",
+"Loading the FP32 model for comparison…", etc.) instead of going silent
+until the final dialog appears. Every result is still cached after its first
+run, so only the first tap per session pays this cost. Wrapped the whole
+background block in a try/catch too — before this, an exception in there
+(no earlier catch existed) would have left the progress dialog on screen
+forever with no way to dismiss it, exactly the "stuck" symptom being fixed.
+
+**Enrol and Check now confirm before touching the microphone**, and can be
+backed out of afterward. `confirmThenRunEnrol()`/`confirmThenRunCheck()` ask
+first ("Enrol `<id>`?" / "Check `<id>`?", with what each actually records)
+before `runEnrol()`/`runCheck()` ever starts. Recording itself was previously
+uninterruptible once started — `AudioCapture.record()` ran its whole loop
+with no way to stop early. Added a `cancel()`/`Cancelled` pair (a `@Volatile`
+flag checked once per read chunk, thrown as a dedicated exception rather than
+folded into a plain `Exception` catch, so a deliberate stop never gets
+reported as a failure) and a small "Cancel" affordance that appears only
+while the waveform is running, itself gated behind its own confirm dialog
+("Stop enrolling?" / "Stop this check?") so a stray tap mid-recording can't
+silently discard it. Cancelling Check discards cleanly, since nothing is
+saved until a clip finishes. Cancelling Enrol keeps whatever whole clips were
+already recorded and saved as healthy in that round — deliberately not
+rolled back, since audio actually captured while the machine was genuinely
+running healthy is still legitimate training data even if the round never
+finishes and no scorer gets built from it.
+
+**Onboarding material now walks through Enrol → Check → Add verdict by
+name**, not a description of acoustic condition monitoring as an idea. New
+`OnboardingActivity` (`activity_onboarding.xml`, dark instrument-panel style
+matching the rest of the app) opens automatically the first time the
+embedder finishes loading (`OnboardingActivity.hasBeenSeen()`, a
+`SharedPreferences` flag set on "Got it"), and any time after via a small
+"How this works" link next to "Full model results." Content mirrors the
+field-facing recording guide already written this session
+(`Injini_Recording_Machines.docx`, built with `docx` in the scratchpad): the
+three concrete steps in order, the one-line warning that enrolling something
+not genuinely healthy poisons the fingerprint, and the three things that
+happen automatically (re-enrollment flagging, the fleet-wide benchmark
+tally, and that sync only ever happens on a deliberate tap).
+
 ## Results summary (for context; full table and narrative in Injini.docx §10)
 
 Five DCASE 2025 machine types (bearing, fan, gearbox, slider, valve), CPU,

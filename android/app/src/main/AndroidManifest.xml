@@ -32,6 +32,11 @@
             android:label="Machines" />
 
         <activity
+            android:name=".OnboardingActivity"
+            android:exported="false"
+            android:label="How this works" />
+
+        <activity
             android:name=".HfSyncActivity"
             android:exported="false"
             android:label="Sync to Injini Cloud" />

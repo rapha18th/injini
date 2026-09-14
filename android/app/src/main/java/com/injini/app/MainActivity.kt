@@ -67,7 +67,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var waveform: WaveformView
     private lateinit var checkButton: Button
     private lateinit var enrolButton: Button
+    private lateinit var cancelRecordingButton: TextView
     private lateinit var resultsLink: TextView
+    private lateinit var howItWorksLink: TextView
 
     private lateinit var features: AudioFeatures
     private lateinit var registry: MachineRegistry
@@ -80,6 +82,10 @@ class MainActivity : AppCompatActivity() {
     private var scorer: AnomalyScorer? = null
     private var machineId: String? = null
     private var busy = false
+    private var resultsBusy = false
+
+    private enum class Flow { ENROL, CHECK }
+    private var currentFlow: Flow? = null
 
     private var int8Bench: InjiniEmbedder.BenchmarkResult? = null
     private var fp32Bench: InjiniEmbedder.BenchmarkResult? = null
@@ -100,7 +106,9 @@ class MainActivity : AppCompatActivity() {
         waveform = findViewById(R.id.waveform)
         checkButton = findViewById(R.id.checkButton)
         enrolButton = findViewById(R.id.enrolButton)
+        cancelRecordingButton = findViewById(R.id.cancelRecordingButton)
         resultsLink = findViewById(R.id.resultsLink)
+        howItWorksLink = findViewById(R.id.howItWorksLink)
 
         features = AudioFeatures(this)
         registry = MachineRegistry(this)
@@ -110,15 +118,20 @@ class MainActivity : AppCompatActivity() {
         thread {
             val e = InjiniEmbedder(this, "injini_mn10_as_int8.onnx")
             e.warmUp()
-            runOnUiThread { embedder = e; restoreLastMachine(); setIdle() }
+            runOnUiThread {
+                embedder = e; restoreLastMachine(); setIdle()
+                if (!OnboardingActivity.hasBeenSeen(this)) OnboardingActivity.start(this)
+            }
         }
 
         machinePicker.setOnClickListener { showMachinePickerDropdown() }
         machinesButton.setOnClickListener { pickMachine.launch(Intent(this, MachineListActivity::class.java)) }
         addVerdictButton.setOnClickListener { machineId?.let { verdictFlow.showQueue(it) } }
-        checkButton.setOnClickListener { ensureMic { withMachine { runCheck() } } }
-        enrolButton.setOnClickListener { ensureMic { withMachine { runEnrol() } } }
+        checkButton.setOnClickListener { ensureMic { withMachine { confirmThenRunCheck() } } }
+        enrolButton.setOnClickListener { ensureMic { withMachine { confirmThenRunEnrol() } } }
+        cancelRecordingButton.setOnClickListener { confirmCancelRecording() }
         resultsLink.setOnClickListener { showResults() }
+        howItWorksLink.setOnClickListener { OnboardingActivity.start(this) }
     }
 
     override fun onResume() {
@@ -223,6 +236,7 @@ class MainActivity : AppCompatActivity() {
         runOnUiThread {
             waveform.visibility = View.VISIBLE
             waveform.start()
+            cancelRecordingButton.visibility = View.VISIBLE
             status(title, detail)
         }
         try {
@@ -234,8 +248,44 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         } finally {
-            runOnUiThread { waveform.stop(); waveform.visibility = View.GONE }
+            runOnUiThread { waveform.stop(); waveform.visibility = View.GONE; cancelRecordingButton.visibility = View.GONE }
         }
+    }
+
+    /** Asks before starting either flow — both run the microphone for real, so a stray tap shouldn't. */
+    private fun confirmThenRunEnrol() {
+        val id = machineId ?: return
+        AlertDialog.Builder(this)
+            .setTitle("Enrol $id?")
+            .setMessage("Records $ENROL_CLIPS ten-second clips while it runs normally, and builds its healthy fingerprint. Every clip joins the training corpus as healthy. Only enrol while nothing is wrong with it right now.")
+            .setPositiveButton("Start") { _, _ -> runEnrol() }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun confirmThenRunCheck() {
+        val id = machineId ?: return
+        AlertDialog.Builder(this)
+            .setTitle("Check $id?")
+            .setMessage("Records one ten-second clip and compares it to $id's healthy fingerprint.")
+            .setPositiveButton("Start") { _, _ -> runCheck() }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    /** The in-progress cancel affordance — confirms before actually stopping, since a stray tap here shouldn't discard a recording already underway. */
+    private fun confirmCancelRecording() {
+        val flow = currentFlow ?: return
+        val (title, message) = when (flow) {
+            Flow.ENROL -> "Stop enrolling?" to "Clips already recorded this round stay saved as healthy. Run Enrol again later to finish building the fingerprint."
+            Flow.CHECK -> "Stop this check?" to "This recording will be discarded."
+        }
+        AlertDialog.Builder(this)
+            .setTitle(title)
+            .setMessage(message)
+            .setPositiveButton("Stop") { _, _ -> capture.cancel() }
+            .setNegativeButton("Keep going", null)
+            .show()
     }
 
     // -------------------------------------------------------------------- idle
@@ -274,6 +324,7 @@ class MainActivity : AppCompatActivity() {
         val m = registry.find(id) ?: return
         if (busy) return
         busy = true
+        currentFlow = Flow.ENROL
         checkButton.isEnabled = false; enrolButton.isEnabled = false
         thread {
             val healthy = ArrayList<FloatArray>(ENROL_CLIPS)
@@ -298,8 +349,18 @@ class MainActivity : AppCompatActivity() {
                 val s = AnomalyScorer.enroll(healthy)
                 registry.saveScorer(id, s.toJson())
                 runOnUiThread { scorer = s; refreshMachineInfo(id); setIdle() }
+            } catch (ex: AudioCapture.Cancelled) {
+                val saved = healthy.size
+                runOnUiThread {
+                    status("ENROL CANCELLED", if (saved > 0)
+                        "$saved of $ENROL_CLIPS clips were saved as healthy before this was stopped. Run Enrol again to finish $id's fingerprint."
+                    else "Nothing was saved.")
+                    refreshMachineInfo(id); refreshButtons()
+                }
             } catch (ex: Exception) {
                 runOnUiThread { status("ENROL FAILED", ex.message ?: "unknown error"); setIdle() }
+            } finally {
+                currentFlow = null
             }
         }
     }
@@ -313,6 +374,7 @@ class MainActivity : AppCompatActivity() {
         val m = registry.find(id) ?: return
         if (busy) return
         busy = true
+        currentFlow = Flow.CHECK
         checkButton.isEnabled = false; enrolButton.isEnabled = false
         thread {
             try {
@@ -351,8 +413,12 @@ class MainActivity : AppCompatActivity() {
                     refreshMachineInfo(id)
                     refreshButtons()
                 }
+            } catch (ex: AudioCapture.Cancelled) {
+                runOnUiThread { status("CHECK CANCELLED", "Nothing was saved."); refreshButtons() }
             } catch (ex: Exception) {
                 runOnUiThread { status("CHECK FAILED", ex.message ?: "unknown error"); setIdle() }
+            } finally {
+                currentFlow = null
             }
         }
     }
@@ -361,37 +427,65 @@ class MainActivity : AppCompatActivity() {
 
     private fun showResults() {
         val e = embedder ?: return
+        if (resultsBusy) return
+        resultsBusy = true
+        resultsLink.alpha = 0.5f
+        // The first tap ever does real work here — loading a second, FP32 copy
+        // of the model just to benchmark it against the INT8 one — which used
+        // to sit with no feedback and look like a stuck screen. Later taps are
+        // instant, since every result below is cached after its first run.
+        val progress = AlertDialog.Builder(this)
+            .setTitle("Full model results")
+            .setMessage("Starting…")
+            .setCancelable(false)
+            .create()
+        progress.show()
+        fun setProgress(msg: String) = runOnUiThread { progress.setMessage(msg) }
         thread {
-            val dummyMel = features.logMel(FloatArray(AudioFeatures.CLIP_SAMPLES))
-            if (providerTrace == null) providerTrace = e.diagnoseExecutionProviders(dummyMel)
-            if (int8Bench == null) int8Bench = e.benchmark(dummyMel)
-            if (fp32Embedder == null) fp32Embedder = InjiniEmbedder(this, "injini_mn10_as_fp32.onnx").also { it.warmUp() }
-            if (fp32Bench == null) fp32Bench = fp32Embedder!!.benchmark(dummyMel)
-            val text = buildString {
-                appendLine("Embedder: EfficientAT mn10_as, frozen, ${e.embedDim}-d")
-                appendLine("Configured providers: ${e.configuredProviders}")
-                appendLine("Executed per node: ${providerTrace}")
-                appendLine()
-                appendLine("Steady-state embed (50-run avg style, 20 timed):")
-                appendLine("  INT8  ${"%.2f".format(int8Bench!!.avgMs)} ms   (min ${"%.2f".format(int8Bench!!.minMs)})")
-                appendLine("  FP32  ${"%.2f".format(fp32Bench!!.avgMs)} ms   (min ${"%.2f".format(fp32Bench!!.minMs)})")
-                appendLine("  load  INT8 ${"%.1f".format(e.loadTimeMs)} ms   FP32 ${"%.1f".format(fp32Embedder!!.loadTimeMs)} ms")
-                appendLine()
-                appendLine("Process memory (PSS): ${DeviceDiagnostics.pssKb()} KB")
-                appendLine("Thermal status: ${DeviceDiagnostics.thermalStatus(this@MainActivity)}")
-                appendLine()
-                appendLine("Machines on this phone: ${registry.all().size}")
-                appendLine("Training clips collected: ${clipStore.clipCount()}")
-                appendLine("Recordings awaiting a verdict: ${clipStore.pendingCount()}")
-                appendLine()
-                appendLine("Field benchmark (on-device tier vs. mechanic verdict):")
-                appendLine("  False positives (flagged, turned out healthy): ${registry.totalFalsePositives()}")
-                appendLine("  Missed faults (read healthy, turned out faulty): ${registry.totalFalseNegatives()}")
-                appendLine("  Machines needing re-enrollment: ${registry.countNeedingReenrollment()}")
-            }
-            runOnUiThread {
-                AlertDialog.Builder(this).setTitle("Full model results").setMessage(text)
-                    .setPositiveButton("OK", null).show()
+            try {
+                val dummyMel = features.logMel(FloatArray(AudioFeatures.CLIP_SAMPLES))
+                if (providerTrace == null) { setProgress("Tracing execution providers…"); providerTrace = e.diagnoseExecutionProviders(dummyMel) }
+                if (int8Bench == null) { setProgress("Benchmarking the INT8 model…"); int8Bench = e.benchmark(dummyMel) }
+                if (fp32Embedder == null) { setProgress("Loading the FP32 model for comparison…"); fp32Embedder = InjiniEmbedder(this, "injini_mn10_as_fp32.onnx").also { it.warmUp() } }
+                if (fp32Bench == null) { setProgress("Benchmarking the FP32 model…"); fp32Bench = fp32Embedder!!.benchmark(dummyMel) }
+                setProgress("Gathering field benchmark totals…")
+                val text = buildString {
+                    appendLine("Embedder: EfficientAT mn10_as, frozen, ${e.embedDim}-d")
+                    appendLine("Configured providers: ${e.configuredProviders}")
+                    appendLine("Executed per node: ${providerTrace}")
+                    appendLine()
+                    appendLine("Steady-state embed (50-run avg style, 20 timed):")
+                    appendLine("  INT8  ${"%.2f".format(int8Bench!!.avgMs)} ms   (min ${"%.2f".format(int8Bench!!.minMs)})")
+                    appendLine("  FP32  ${"%.2f".format(fp32Bench!!.avgMs)} ms   (min ${"%.2f".format(fp32Bench!!.minMs)})")
+                    appendLine("  load  INT8 ${"%.1f".format(e.loadTimeMs)} ms   FP32 ${"%.1f".format(fp32Embedder!!.loadTimeMs)} ms")
+                    appendLine()
+                    appendLine("Process memory (PSS): ${DeviceDiagnostics.pssKb()} KB")
+                    appendLine("Thermal status: ${DeviceDiagnostics.thermalStatus(this@MainActivity)}")
+                    appendLine()
+                    appendLine("Machines on this phone: ${registry.all().size}")
+                    appendLine("Training clips collected: ${clipStore.clipCount()}")
+                    appendLine("Recordings awaiting a verdict: ${clipStore.pendingCount()}")
+                    appendLine()
+                    appendLine("Field benchmark (on-device tier vs. mechanic verdict):")
+                    appendLine("  False positives (flagged, turned out healthy): ${registry.totalFalsePositives()}")
+                    appendLine("  Missed faults (read healthy, turned out faulty): ${registry.totalFalseNegatives()}")
+                    appendLine("  Machines needing re-enrollment: ${registry.countNeedingReenrollment()}")
+                }
+                runOnUiThread {
+                    progress.dismiss()
+                    resultsBusy = false
+                    resultsLink.alpha = 1f
+                    AlertDialog.Builder(this).setTitle("Full model results").setMessage(text)
+                        .setPositiveButton("OK", null).show()
+                }
+            } catch (ex: Exception) {
+                runOnUiThread {
+                    progress.dismiss()
+                    resultsBusy = false
+                    resultsLink.alpha = 1f
+                    AlertDialog.Builder(this).setTitle("Couldn't gather results").setMessage(ex.message ?: "unknown error")
+                        .setPositiveButton("OK", null).show()
+                }
             }
         }
     }

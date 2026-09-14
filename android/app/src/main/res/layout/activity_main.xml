@@ -204,6 +204,22 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
+    <!-- Only visible while a recording is actually running (see waveform,
+         above) — recording used to be uninterruptible once started. -->
+    <TextView
+        android:id="@+id/cancelRecordingButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="Cancel"
+        android:textColor="@color/injini_red"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:padding="6dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/waveform"
+        app:layout_constraintStart_toStartOf="parent" />
+
     <!--
       Plain AppCompatButton, not <Button> — the Material Components theme
       auto-promotes a bare <Button> to MaterialButton, which paints its own
@@ -250,7 +266,16 @@
         android:textColor="@color/injini_dim"
         android:textSize="13sp"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <TextView
+        android:id="@+id/howItWorksLink"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="How this works"
+        android:textColor="@color/injini_dim"
+        android:textSize="13sp"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
